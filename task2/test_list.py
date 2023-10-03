@@ -27,7 +27,7 @@ arr_times_numpy = []
 arr_times_list = []
 
 arr_iters = []
-step = 800000
+step = 100000
 start_iter = 10
 end_iter = 3000000
 adf = 0
