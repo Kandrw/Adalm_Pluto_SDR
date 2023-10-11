@@ -38,3 +38,8 @@
         fft
 
 <img src= "task3/arrange_200_fft.png">
+
+### task4 - Изучение основных свойств ДПФ с помощью моделирования в  Python/Spyder
+    ds_Fourier.py - дискретное преобразование Фурье
+<img src= "task4/ds_fourier.png">
+    prtask2.py - Преобразование Фурье к сигналу полученному от Adalm_Pluto_SDR
