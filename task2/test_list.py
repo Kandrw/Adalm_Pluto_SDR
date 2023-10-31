@@ -47,8 +47,8 @@ plt.ylabel("Время сортировки")
 plt.legend(["List", "Numpy"])
 plt.show()
 print("End program: ", time.time() - start_program)
-
-
+print("Numpy: ", arr_times_numpy[29])
+print("List: ", arr_times_list[29])
 
  
  

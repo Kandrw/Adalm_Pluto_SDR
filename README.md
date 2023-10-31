@@ -3,18 +3,21 @@
 ### task1 - основы, генерация сигнала в реальном времени
 
 ### task2 - Формирование сигналов, визуализация в Python. 
-    test_list.py - Сравнение скорости работы lists и NumPy
 
+
+<details>
+    test_list.py - Сравнение скорости работы lists и NumPy
 <img src= "task2/test_sort_speed.png">
 
     test_plot.py - Создание графиков с различным стилем отображения
 
 <img src= "task2/type_plot.png">
 
+</details>
 
 ### task3 - Изучение основных параметров библиотеки PyAdi для Adalm Pluto SDR
 
-
+<details>
     Определение наисильнейшего сигнала - 2412 Мгц
     Передача данных на данной частоте
 <img src= "task3/signal_data.jpg">
@@ -39,7 +42,11 @@
 
 <img src= "task3/arrange_200_fft.png">
 
+</details>
+
 ### task4 - Изучение основных свойств ДПФ с помощью моделирования в  Python/Spyder
+
+<details>
     ds_Fourier.py - дискретное преобразование Фурье
 <img src= "task4/image/ds_fourier.png">
     prtask2.py - Преобразование Фурье к сигналу полученному от Adalm_Pluto_SDR
@@ -88,8 +95,11 @@
     X=np.array([0,0,2+1j,0,0,0,0,1,1j,0,0,2,1,1,1,0])
 <img src= "task4/image/6_4.png">
 
+</details>
+
 ### task5 - Передача/прием sin() сигнала. Реализация АМ модуляции. PlutoSDR.
 
+<details>
     Передача одиночного сигнала
 
 <img src= "task5/image/image1.jpg">
@@ -103,5 +113,34 @@
     В данном случае передана последовательность: 11111111110101010101
 
 <img src= "task5/image/image3.jpg">
+</details>
 
+### task6 - Модуляции QPSK, QAM. Раздельный приём и передача на SDR
+
+<details>
+
+    file1.py - Программа взятая за основу (Моделирование сигнала, накладывание шума, декодирование)
+    
+<details>
+<summary>Графики file1.py</summary>
+<img src= "task6/img/base/1.png">
+<img src= "task6/img/base/2.png">
+<img src= "task6/img/base/3.png">
+
+
+
+</details>
+
+    file2.py - Отправленный и полученный сигнал соответственно
+
+<img src= "task6/img/1.jpg">
+
+    file3.py - спектр полученного сигнала
+<img src= "task6/img/2.jpg">
+
+
+    file4_e3.py - другой вид представления полученного сигнала
+<img src= "task6/img/4.jpg">
+<img src= "task6/img/5.jpg">
+</details>
 
