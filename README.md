@@ -144,3 +144,21 @@
 <img src= "task6/img/5.jpg">
 </details>
 
+### task7 - 
+
+<details>
+
+    file1.py - программа способная работать как передатчик так и отправитель сигнала
+    Сформированный сигнал
+<img src= "task7/img/1.jpg">
+
+    Полученный сигнал
+
+<img src= "task7/img/3.jpg">    
+
+<img src= "task7/img/4.png"> 
+
+</details>
+
+
+
