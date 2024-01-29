@@ -2,16 +2,10 @@
 
 
 class RxTx:
-    #sdr_con = False
     sdr = None
-    #__sdr = 23
-    #__rx_lo = 1
-    #__tx_lo = 1
     buffer = None
     
     def __init__(self, sdr = None, rx_lo = 2e9, tx_lo = 2e9, sample_rate = 1e6):
-        #sdr_con = sdr
-        
         self.sdr = sdr
         if(not sdr is None):
             self.sdr.rx_lo = rx_lo

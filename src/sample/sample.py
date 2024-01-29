@@ -9,9 +9,13 @@ def data_to_byte(data):
 
 	
 
+def add_crc(data, polinom):
+	size_polinom = len(polinom)
+	print("size polinom:", size_polinom)
+	data = np.append(data, [0 for i in range(size_polinom - 1)])
+	
 
-
-
+	return data
 
 
 
