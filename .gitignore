@@ -1,0 +1,4 @@
+*.dll
+*.o
+*.exe
+*.cpython-311.pyc
