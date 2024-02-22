@@ -9,21 +9,22 @@ from scipy.fftpack import fft, ifft,  fftshift, ifftshift
 
 #1 - new, 2 - old
 
-CON_DATA = 1
-CON_GENERATE_SIGNAL = 1
+CON_DATA = 2
+CON_GENERATE_SIGNAL = 2
 CON_RECV_SIG = 3
 
 
-sdr = adi.Pluto('ip:192.168.3.1')
+sdr = adi.Pluto('ip:192.168.2.1')
 sdr.sample_rate = 1000000
 sdr.tx_destroy_buffer()
  
 
-sdr.rx_lo = 2000000000
-sdr.tx_lo = 2000000000
+sdr.rx_lo = 1900100011
+sdr.tx_lo = 1900100011
 sdr.tx_cyclic_buffer = True
 #sdr.tx_cyclic_buffer = False
-sdr.tx_hardwaregain_chan0 = -5
+sdr.tx_hardwaregain_chan0 = 0
+sdr.rx_hardwaregain_chan0 = 70
 sdr.gain_control_mode_chan0 = "fast_attack"#"slow_attack"
 
 fs = sdr.sample_rate
@@ -104,7 +105,7 @@ if CON_DATA == 2:
     
     N = 50
     n_qpsk = 4
-    
+    data = "10101010010101010010100101"
     bits = list(data)
     bits = list(map(int, bits))
     bits = list(map(str, bits))
@@ -136,10 +137,10 @@ plt.figure(1, figsize=(10, 10))
 plt.scatter(xiq.real,xiq.imag)
 
 np.savetxt(filename_input, xiq, delimiter=":")
-sdr.rx_rf_bandwidth = 1000000
-sdr.rx_destroy_buffer()
-sdr.rx_hardwaregain_chan0 = -5
-sdr.rx_buffer_size =2*n_frame*4
+#sdr.rx_rf_bandwidth = 1000000
+#sdr.rx_destroy_buffer()
+#sdr.rx_hardwaregain_chan0 = -5
+sdr.rx_buffer_size =2*len(xiq)*8
 
 sdr.tx(xiq)
 xrec1=sdr.rx()

@@ -15,13 +15,13 @@ import tx_rx.conf as conf
 
 import sample.sample as sample
 
-PLATFORM = "Win"
+PLATFORM = "Linux"
 
 rf_module = conf.RxTx()
 rf_module.print_parameters()
 
 
-dir_gen_packet = "..\src\generate_packet\\"
+dir_gen_packet = "../src/generate_packet/"
 argvs = ['data.txt', 'gold_sequence.txt', 'gold_seq_end.txt', 'data_bin.txt' ]
 
 for i in range(len(argvs)):
@@ -32,7 +32,7 @@ if(PLATFORM == "Win"):
     module_gen_header += ".exe"
 
     
-data = "Test data"
+data = "Test dataadfa fasdfasdf"
 
 file = open(argvs[0], "w")
 file.write(data)
@@ -59,8 +59,9 @@ plt.plot(data_bin)
 N = 10
 data_rep = sample.duplication_sample(data_bin, N)
 #data_qpsk = sample.encode_QPSK(data_rep, 4)
+#data_rep = data_bin
 data_rep = data_bin
-data_qpsk = np.array(sample.encode_QAM(data_rep, 4))
+data_qpsk = np.array(sample.encode_QAM(data_rep, 16))
 
 plt.subplot(2, 2, 2)
 plt.title("Data duplicate")

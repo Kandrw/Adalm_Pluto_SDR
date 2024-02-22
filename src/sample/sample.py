@@ -52,6 +52,7 @@ def encode_QAM(data_bit, N):#[0, 1, 0, 1, ....], уровень QAM
         return
     sample = [] # массив комплексных чисел
     k1 = calc_coeff(int(np.log2(N))/2)
+    print("k1 = ", k1)
     for i in range(0, len(data_bit), int(np.log2(N))):
         sr = data_bit[i:i+int(np.log2(N))]
         sr = list(reversed(sr))
@@ -62,4 +63,7 @@ def encode_QAM(data_bit, N):#[0, 1, 0, 1, ....], уровень QAM
         dd = (d1 * d2) /np.sqrt(k1) + ((d1i * d2i) / np.sqrt(k1)) * 1j
         sample.append(dd)
     return sample
+
+
+
 

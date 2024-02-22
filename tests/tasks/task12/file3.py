@@ -14,13 +14,20 @@ from scipy import signal
 from scipy.signal import max_len_seq
 from scipy import fftpack
 
-sdr = adi.Pluto('ip:192.168.3.1')
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../src')))
+
+import tx_rx.conf as conf
+import sample.sample as sample
+
+sdr = adi.Pluto('ip:192.168.2.1')
 sdr.sample_rate = 1000000
 sdr.tx_destroy_buffer()
  
 
-sdr.rx_lo = 2000000000
-sdr.tx_lo = 2000000000
+sdr.rx_lo = 2010000000
+sdr.tx_lo = 2010000000
 sdr.tx_cyclic_buffer = True
 #sdr.tx_cyclic_buffer = False
 sdr.tx_hardwaregain_chan0 = -5
@@ -72,6 +79,15 @@ xup = np.hstack((x_bb.reshape(N_input,1),np.zeros((N_input, int(ns-1)))))
 xup= xup.flatten()
 x1 = signal.lfilter(b, 1,xup) 
 
+
+data_bin1 = np.random.randint(0, 2, 20000)
+N = 15
+data_rep1 = sample.duplication_sample(data_bin1, N)
+N_qam = 4
+#data_qpsk = np.array(sample.encode_QAM(data_rep, N_qam))
+data_qpsk1 = sample.encode_QPSK(data_rep1, 4)
+#x1 = data_qpsk1
+
 plt.figure(1)
 #plt.scatter(x_bb.real,x_bb.imag)
 plt.scatter(x1.real,x1.imag)
@@ -97,7 +113,9 @@ sdr.tx_destroy_buffer()
 xrec = xrec1/np.mean(xrec1**2)
 xrecf=np.convolve(xrec ,b)
 plt.subplot(2, 2, 2)
-plt.scatter(xrecf.real,xrecf.imag, c="g")
+#plt.scatter(xrecf.real,xrecf.imag, c="g")
+plt.scatter(xrecf.real,xrecf.imag, c="brown")
+
 plt.title('received signal before correction')
 
 

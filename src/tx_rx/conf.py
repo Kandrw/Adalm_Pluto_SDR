@@ -8,6 +8,7 @@ class RxTx:
     def __init__(self, sdr = None, rx_lo = 2e9, tx_lo = 2e9, sample_rate = 1e6):
         self.sdr = sdr
         if(not sdr is None):
+            print("11111111")
             self.sdr.rx_lo = rx_lo
             self.sdr.tx_lo = tx_lo
             self.sdr.sample_rate = sample_rate
@@ -21,14 +22,14 @@ class RxTx:
 
     def recv(self):
         if(not self.sdr is None):
-            return sdr.rx()
+            return self.sdr.rx()
         else:
             self.generate_noise()
             return self.buffer
 
     def send(self, msg):
         if(not self.sdr is None):
-            return sdr.tx(msg)
+            return self.sdr.tx(msg)
         else:
             self.buffer = msg
     

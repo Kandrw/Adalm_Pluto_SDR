@@ -21,7 +21,7 @@ CON_TX = 1
 CON_RX = 1
 
 
-sdr = adi.Pluto('ip:192.168.3.1')
+sdr = adi.Pluto('ip:192.168.2.1')
 sdr.sample_rate = 1000000
 sdr.tx_destroy_buffer()
  
