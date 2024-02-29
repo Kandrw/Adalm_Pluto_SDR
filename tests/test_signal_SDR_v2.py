@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu Feb 22 15:54:07 2024
+Created on Thu Feb 29 16:58:16 2024
 
 @author: plutosdr
 """
+
 
 import os
 import sys
@@ -28,18 +29,31 @@ import sample.sample as sample
 PLATFORM = "Linux"
 
 
-
 sdr = adi.Pluto('ip:192.168.2.1')
-sdr.sample_rate = 1000000
-sdr.tx_destroy_buffer()
-sdr.rx_destroy_buffer()
-sdr.rx_lo = 1900100011
-sdr.tx_lo = 1900100011
-sdr.tx_cyclic_buffer = True
-#sdr.tx_cyclic_buffer = False
-sdr.tx_hardwaregain_chan0 = 0
-sdr.rx_hardwaregain_chan0 = 70
-sdr.gain_control_mode_chan0 = "slow_attack"
+
+#sdr2 = sdr
+sdr2 = adi.Pluto('ip:192.168.3.1')
+
+
+
+def config_(sdr):
+    
+
+    sdr.sample_rate = 1000000
+    sdr.tx_destroy_buffer()
+    sdr.rx_destroy_buffer()
+    sdr.rx_lo = 1900100011
+    sdr.tx_lo = 1900100011
+    sdr.tx_cyclic_buffer = True
+    #sdr.tx_cyclic_buffer = False
+    sdr.tx_hardwaregain_chan0 = 0
+    sdr.rx_hardwaregain_chan0 = 20
+    #sdr.gain_control_mode_chan0 = "slow_attack"
+    sdr.gain_control_mode_chan0 = "manual"
+    
+
+config_(sdr)
+config_(sdr2)
 
 
 #rf_module = conf.RxTx(adi.Pluto('ip:192.168.2.1'))
@@ -142,7 +156,7 @@ fs = sdr.sample_rate
 rs=100000
 ns=fs//rs
 
-CON_GEN_DATA = 1
+CON_GEN_DATA = 0
 
 if CON_GEN_DATA == 1:
     data=max_len_seq(8)[0] 
@@ -165,15 +179,15 @@ elif CON_GEN_DATA == 2:
 elif CON_GEN_DATA == 3:
     pass
 
-xup= xup.flatten()
-b = np.ones(int(ns))
-x1 = signal.lfilter(b, 1,xup) 
-
-data_qpsk = x1
+if CON_GEN_DATA:
+    xup= xup.flatten()
+    b = np.ones(int(ns))
+    x1 = signal.lfilter(b, 1,xup) 
+    data_qpsk = x1
 #data_qpsk += 7+7j
 
-
-
+#data_qpsk = 
+data_qpsk = np.array(data_qpsk)
 plt.subplot(2, 2, 2)
 plt.title(f"QAM{N_qam}")
 plt.scatter(data_qpsk.real, data_qpsk.imag)
@@ -218,7 +232,71 @@ def gardner_TED(data):
         errors[i] = (data.real[i-1]) % N
     
 
+def TED_loop_filter(data): #ted loop filter 
+    BnTs = 0.01 
+    Nsps = 10
+    C = np.sqrt(2)
+    Kp = 1
+    teta = ((BnTs)/(Nsps))/(C + 1/(4*C))
+    K1 = (-4*C*teta)/((1+2*C*teta+teta**2)*Kp)
+    K2 = (-4*teta**2)/((1+2*C*teta+teta**2)*Kp)
+    print("K1 = ", K1)
+    print("K2 = ", K2)
+    #K1_2 = (1/Kp)*((((4*C)/(Nsps**2))*((BnTs/(C + (1/4*C)))**2))/(1 + ((2 * C)/Nsps)*(BnTs/(C + (1/(4*C))))+(BnTs/(Nsps*(C+(1/4*C))))**2))
+    err = np.zeros(len(data)//10, dtype = "complex_")
+    data = np.roll(data,-0)
+    nsp = 10
+    p1 = 0
+    p2 = 0
+    n = 0
+    mass_cool_inex = []
+    mass_id = []
+    for ns in range(0,len(data)-(2*nsp),nsp):
+        #real = (data.real[ns+n] - data.real[nsp+ns+n]) * data.real[n+(nsp)//2+ns]
+        #imag = (data.imag[ns+n] - data.imag[nsp+ns+n]) * data.imag[n+(nsp)//2+ns]
+        real = (data.real[nsp+ns+n] - data.real[ns+n]) * data.real[n + (nsp)//2+ns]
+        imag = (data.imag[nsp+ns+n] - data.imag[ns+n] ) * data.imag[n + (nsp)//2+ns]
+        err[ns//nsp] = np.mean(real + imag)
+        #err[ns//nsp] = np.mean((np.conj(data[nsp+ns+n]) - np.conj(data[ns+n]))*(data[n + (nsp)//2+ns])) 
+        error = err.real[ns//nsp]
+        p1 = error * K1
+        p2 = p2 + p1 + error * K2
+        #print(ns ," p2 = ",p2)  
+        while(p2 > 1):
+            #print(ns ," p2 = ",p2)
+            p2 = p2 - 1
+        while(p2 < -1):
+            #print(ns ," p2 = ",p2)
+            p2 = p2 + 1
+        
+        n = round(p2*10)  
+        n1 = n+ns+nsp   
+        mass_cool_inex.append(n1)
+        mass_id.append(n)
 
+    #mass_cool_inex = [math.ceil(mass_cool_inex[i]) for i in range(len(mass_cool_inex))]
+    mass1 = np.asarray(mass_cool_inex)
+    mass = np.asarray(mass_id)
+    plt.figure(10, figsize=(10, 10))
+    plt.subplot(2,1,1)
+    plt.plot(err) 
+    plt.subplot(2,1,2)
+    plt.plot(mass)   
+    
+    return mass1
+def PLL(conv):
+    mu = 1  
+    theta = 1
+    phase_error = np.zeros(len(conv))  
+    output_signal = np.zeros(len(conv), dtype=np.complex128)
+
+    for n in range(len(conv)):
+        theta_hat = np.angle(conv[n]) 
+        #print(theta_hat)
+        phase_error[n] = theta_hat - theta  
+        output_signal[n] = conv[n] * np.exp(-1j * theta)  
+        theta = theta + mu * phase_error[n]  
+    return output_signal
 
 
 #gardner_TED(data_conv)
@@ -227,8 +305,10 @@ def gardner_TED(data):
 #sdr.rx_rf_bandwidth = 1000000
 #sdr.rx_destroy_buffer()
 #sdr.rx_hardwaregain_chan0 = -5
-sdr.rx_buffer_size =2*len(data_qpsk) *2
-data_qpsk *= 2**15
+sdr.rx_buffer_size =2*len(data_qpsk) *4
+sdr2.rx_buffer_size =2*len(data_qpsk) *4
+
+data_qpsk *= 2**14
 plt.subplot(2, 2, 4)
 plt.title(f"QAM{N_qam}")
 plt.scatter(data_qpsk.real, data_qpsk.imag)
@@ -236,21 +316,27 @@ plt.scatter(data_qpsk.real, data_qpsk.imag)
 
 if 1:
     #OFDM
-    Nc = 4
-    xt2 = np.fft.ifft(data_qpsk, Nc)
+    Nc = N_qam
+    xt2 = data_qpsk
+    #xt2 = np.fft.ifft(data_qpsk, Nc)
     #sdr.tx(data_qpsk)
     sdr.tx(xt2)
     
     
-    data_read = sdr.rx()
-    n = 3
-    data_read = np.fft.fft(data_read, n)
-    
-    data_read = np.convolve(np.ones(N), data_read)
+    data_read = sdr2.rx()
     sdr.tx_destroy_buffer()
     sdr.rx_destroy_buffer()
+    sdr2.tx_destroy_buffer()
+    sdr2.rx_destroy_buffer()
+    n = 3
+    #data_readF = np.fft.fft(data_read, n)
     
-    data_read = data_read/np.mean(data_read**2)
+    data_read = np.convolve(np.ones(N2), data_read)/1000
+    indexs = TED_loop_filter(data_read)
+    
+    data_read = data_read[indexs]
+    data_read1 = PLL(data_read)
+    #data_read = data_read/np.mean(data_read**2)
     #data_read_1 = data_read
     
     plt.figure(5, figsize=(10, 10))
@@ -260,12 +346,19 @@ if 1:
     plt.subplot(2, 2, 2)
     plt.plot(data_read.real)
     plt.plot(data_read.imag)
+    
+    plt.subplot(2, 2, 3)
+    plt.title("Обработанный сигнал")
+    plt.scatter(data_read1.real, data_read1.imag)
     plt.show()
 
 else:
     xrec1=sdr.rx()
     #Отключение циклической передачи
     sdr.tx_destroy_buffer()
+    plt.subplot(2,2,2)
+    plt.title("Принятый")
+    plt.scatter(xrec1.real,xrec1.imag)
     #qpsk
     filename_input = "input_qpsk_new_type.txt"
     filename_output = "output_qosk_new_type.txt"
@@ -274,9 +367,9 @@ else:
     np.savetxt(filename_output, xrec1, delimiter=":")
     xrec = xrec1/np.mean(xrec1**2)
 
-    plt.subplot(2,2,2)
-    plt.title("Принятый")
-    plt.scatter(xrec.real,xrec.imag)
+    #plt.subplot(2,2,2)
+    #plt.title("Принятый")
+    #plt.scatter(xrec.real,xrec.imag)
 
     #   Грубая частотная синхронизация
     m = 4

@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 import tx_rx.conf as conf
 import sample.sample as sample
 
-sdr = adi.Pluto('ip:192.168.2.1')
+sdr = adi.Pluto('ip:192.168.3.1')
 sdr.sample_rate = 1000000
 sdr.tx_destroy_buffer()
  
