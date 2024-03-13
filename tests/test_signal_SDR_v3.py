@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu Feb 29 16:58:16 2024
+Created on Wed Mar 13 15:46:23 2024
 
 @author: plutosdr
 """
@@ -28,22 +28,18 @@ import sample.sample as sample
 
 PLATFORM = "Linux"
 
-
-sdr = adi.Pluto('ip:192.168.2.1')
-
-#sdr2 = sdr
-sdr2 = adi.Pluto('ip:192.168.3.1')
-
-
+sample_rate  = 1000000
 
 def config_(sdr):
     
-
-    sdr.sample_rate = 1000000
+    F_n = 2900100011
+    sdr.sample_rate = sample_rate
     sdr.tx_destroy_buffer()
     sdr.rx_destroy_buffer()
-    sdr.rx_lo = 1900100011
-    sdr.tx_lo = 1900100011
+    #sdr.rx_lo = 1900100011
+    #sdr.tx_lo = 1900100011
+    sdr.rx_lo = F_n
+    sdr.tx_lo = F_n
     sdr.tx_cyclic_buffer = True
     #sdr.tx_cyclic_buffer = False
     sdr.tx_hardwaregain_chan0 = 0
@@ -51,9 +47,6 @@ def config_(sdr):
     #sdr.gain_control_mode_chan0 = "slow_attack"
     sdr.gain_control_mode_chan0 = "manual"
     
-
-config_(sdr)
-config_(sdr2)
 
 
 #rf_module = conf.RxTx(adi.Pluto('ip:192.168.2.1'))
@@ -139,86 +132,30 @@ plt.subplot(2, 2, 1)
 plt.title("Data")
 plt.plot(data_bin)
 
-
-
 N = 10
-#data_rep = sample.duplication_sample(data_bin, N)
-
-#data_rep = data_bin
 data_rep = data_bin
 N_qam = 4
 data_qpsk = np.array(sample.encode_QAM(data_rep, N_qam))
 #data_qpsk = sample.encode_QPSK(data_rep, 4)
 N2 = 10#длительность символа
 data_qpsk = sample.duplication_sample(data_qpsk, N2)
+#Количество поднесущих
+Nb = 64
+#Защитный интервал
+N_interval = 16
 
-fs = sdr.sample_rate
+fs = sample_rate
 rs=100000
 ns=fs//rs
 
-CON_GEN_DATA = 0
 
-if CON_GEN_DATA == 1:
-    data=max_len_seq(8)[0] 
-    data = np.concatenate((data,np.zeros(1)))
-    x_ = np.array([1,1,1,-1,-1,-1,1,-1,-1,1,-1])
-    b7=np.array([1,-1,1,1,1,-1,1])
-    m=2*data-1
-    ts1t=b7
-    b1 = sqrt_rc_imp(ns,0.35,4) 
-    b = np.ones(int(ns))
-    x=np.reshape(m,(2,128))
-    xi=x[0,:]
-    xq=x[1,:]
-    x_bb=(xi+1j*xq)/np.sqrt(2)
-    N_input = len(x_bb)
-    xup = np.hstack((x_bb.reshape(N_input,1),np.zeros((N_input, int(ns-1)))))
-elif CON_GEN_DATA == 2:
-    N_input = len(data_qpsk)
-    xup = np.hstack((data_qpsk.reshape(N_input,1),np.zeros((N_input, int(ns-1)))))
-elif CON_GEN_DATA == 3:
-    pass
 
-if CON_GEN_DATA:
-    xup= xup.flatten()
-    b = np.ones(int(ns))
-    x1 = signal.lfilter(b, 1,xup) 
-    data_qpsk = x1
-#data_qpsk += 7+7j
 
-#data_qpsk = 
 data_qpsk = np.array(data_qpsk)
 plt.subplot(2, 2, 2)
 plt.title(f"QAM{N_qam}")
 plt.scatter(data_qpsk.real, data_qpsk.imag)
 
-if 0:
-    h1 = np.ones(N)
-    # Noise
-    pos_read = 0
-    noise_coef = 0.0001
-    data_noise = data_qpsk[0:] 
-    noise = np.random.normal(0, noise_coef, len(data_noise))
-    #data_noise += noise
-    
-    plt.subplot(2, 2, 4)
-    plt.title(f"QAM{N_qam} + noise({noise_coef})")
-    plt.scatter(data_noise.real, data_noise.imag)
-    
-    data_conv = np.convolve(h1,data_noise,'full')
-    
-    plt.figure(3, figsize=(10, 10))
-    plt.subplot(2, 2, 1)
-    plt.title("data convolve")
-    plt.plot(data_conv)
-    
-    #eye diagram
-    data_conv_real = data_conv.real
-    plt.subplot(2, 2, 2)
-    for i in range(0,len(data_conv_real), N):
-         plt.plot(data_conv_real.real[0:N*2])
-         data_conv_real1 = np.roll(data_conv_real,-1* N)
-         data_conv_real= data_conv_real1
     
 
 def gardner_TED(data):
@@ -305,8 +242,6 @@ def PLL(conv):
 #sdr.rx_rf_bandwidth = 1000000
 #sdr.rx_destroy_buffer()
 #sdr.rx_hardwaregain_chan0 = -5
-sdr.rx_buffer_size =2*len(data_qpsk) *4
-sdr2.rx_buffer_size =2*len(data_qpsk) *4
 
 data_qpsk *= 2**14
 plt.subplot(2, 2, 4)
@@ -314,11 +249,106 @@ plt.title(f"QAM{N_qam}")
 plt.scatter(data_qpsk.real, data_qpsk.imag)
 
 
-if 0:
+#sample.OFDM_modulator(data_qpsk, Nb)
+
+#sys.exit()
+
+
+
+
+
+sdr = adi.Pluto('ip:192.168.2.1')
+
+sdr2 = sdr
+#sdr2 = adi.Pluto('ip:192.168.3.1')
+
+
+config_(sdr)
+config_(sdr2)
+
+
+sdr.rx_buffer_size =2*len(data_qpsk) *4
+sdr2.rx_buffer_size =2*len(data_qpsk) *4
+
+CON = 1
+
+if CON == 1:
+    #OFDM
+    Nc = N_qam
+    #xt2 = data_qpsk
+    xt2 = sample.OFDM_modulator(data_qpsk, Nb, N_interval)
+    #xt2 = np.fft.ifft(data_qpsk, Nc)
+    #sdr.tx(data_qpsk)
+    plt.figure(12, figsize=(10, 10))
+    plt.subplot(2, 2, 1)
+    #xt2 = np.concatenate([xt2, np.zeros(4000)])
+    plt.title("OFDM")
+    plt.plot(abs(xt2))
+    #sys.exit()
+   
+    sdr.rx_buffer_size =2*len(xt2) *4
+    sdr2.rx_buffer_size =2*len(xt2) *4
+    
+    sdr.tx(xt2)
+    
+    
+    data_read = sdr2.rx()
+    sdr.tx_destroy_buffer()
+    sdr.rx_destroy_buffer()
+    sdr2.tx_destroy_buffer()
+    sdr2.rx_destroy_buffer()
+    data_read2 = data_read
+    arr = []
+    start_data = -1
+    if_start = 0.7
+    for i in range(0, len(data_read2)):
+        data_read2 = np.roll(data_read2, -1)
+        #a = np.vdot(data_read2[0:N_interval], data_read2[Nb:Nb + N_interval])
+        a = sample.norm_corr(data_read2[0:N_interval], data_read2[Nb:Nb + N_interval])
+        if start_data == -1 and if_start <= a:
+            start_data = i
+        arr.append(a)
+        
+    plt.subplot(2, 2, 2)
+    plt.title("Correlation")
+    plt.plot(arr)
+    
+    print("Начало данных:", start_data)
+    data_read = data_read[start_data]
+    
+    data = sample.del_prefix_while(data_read, Nb, N_interval)
+    print(data)
+    sys.exit()
+    
+    n = 3
+    data_readF = np.fft.fft(data_read, n)
+    #data_read = data_readF
+    data_read = np.convolve(np.ones(N2), data_read)/1000
+    indexs = TED_loop_filter(data_read)
+    
+    #data_read = data_read[indexs]
+    data_read1 = PLL(data_read)
+
+    
+    plt.figure(5, figsize=(10, 10))
+    plt.subplot(2, 2, 1)
+    plt.title("Принятый сигнал")
+    plt.scatter(data_read.real, data_read.imag)
+    plt.subplot(2, 2, 2)
+    plt.plot(data_read.real)
+    plt.plot(data_read.imag)
+    
+    plt.subplot(2, 2, 3)
+    plt.title("Обработанный сигнал")
+    plt.scatter(data_read1.real, data_read1.imag)
+    plt.show()
+
+elif CON == 2:
     #OFDM
     Nc = N_qam
     xt2 = data_qpsk
-    #xt2 = np.fft.ifft(data_qpsk, Nc)
+    
+    xt2 = np.fft.ifft(data_qpsk, Nc)
     #sdr.tx(data_qpsk)
     sdr.tx(xt2)
     
@@ -329,8 +359,8 @@ if 0:
     sdr2.tx_destroy_buffer()
     sdr2.rx_destroy_buffer()
     n = 3
-    #data_readF = np.fft.fft(data_read, n)
-    
+    data_readF = np.fft.fft(data_read, n)
+    data_read = data_readF
     data_read = np.convolve(np.ones(N2), data_read)/1000
     indexs = TED_loop_filter(data_read)
     
@@ -352,60 +382,7 @@ if 0:
     plt.scatter(data_read1.real, data_read1.imag)
     plt.show()
 
-else:
-    xrec1=sdr.rx()
-    #Отключение циклической передачи
-    sdr.tx_destroy_buffer()
-    plt.subplot(2,2,2)
-    plt.title("Принятый")
-    plt.scatter(xrec1.real,xrec1.imag)
-    #qpsk
-    filename_input = "input_qpsk_new_type.txt"
-    filename_output = "output_qosk_new_type.txt"
-      
-    #Сохранение в файл
-    np.savetxt(filename_output, xrec1, delimiter=":")
-    xrec = xrec1/np.mean(xrec1**2)
 
-    #plt.subplot(2,2,2)
-    #plt.title("Принятый")
-    #plt.scatter(xrec.real,xrec.imag)
-
-    #   Грубая частотная синхронизация
-    m = 4
-    xrec = xrec ** m
-    plt.subplot(2,2,3)
-    plt.title("Возведение в степень: "+str(m))
-    plt.scatter(xrec.real,xrec.imag, color = "r")
-    sig_fft = abs(fft(xrec, 2048))
-    plt.subplot(2,2,4)
-    plt.title("модуль от сигнала преобразованного по FFT")
-    plt.stem(sig_fft, "green")
-
-    index_max_elem = np.argmax(sig_fft)
-    print("index_max_elem =", index_max_elem)
-    max_fft_sig = sig_fft[index_max_elem]
-    print("max_fft_sig =",max_fft_sig)
-    sig_fft_shift = fftshift(sig_fft)
-    plt.figure(2, figsize=(10,10))
-    plt.subplot(2,2,1)
-    plt.title("Сдвиг спектра")
-    plt.stem(sig_fft_shift, "black")
-    w = np.linspace(-np.pi, np.pi, len(sig_fft_shift))
-    index_max_elem = np.argmax(abs(sig_fft_shift))
-    print("index_max_elem =", index_max_elem)
-    max_fft_sig = sig_fft[index_max_elem]
-    print("max_fft_sig =",max_fft_sig)
-    print("w[index_max_fft_shift] =", w[index_max_elem])
-    fax = w[index_max_elem] / m
-    print("fax = ", fax)
-    fax = abs(fax)
-    t2 = np.exp( -1j * fax)
-    #Исходный сигнал умножается на угол сдвига
-    xrec2 = xrec1 * t2
-    plt.subplot(2,2,2)
-    plt.title("Сдвиг принятого сигнала")
-    plt.scatter(xrec2.real,xrec2.imag, color = "g")
 
 
 

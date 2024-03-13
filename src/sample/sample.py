@@ -65,5 +65,36 @@ def encode_QAM(data_bit, N):#[0, 1, 0, 1, ....], уровень QAM
     return sample
 
 
+def OFDM_modulator(data, Nb, N_interval):
+    data = np.array(data)
+    ofdm_data = []
+    
+    print("len = ", len(data))
+    for i in range(0, len(data), Nb):
+        arr = data[i : i + Nb]
+        if(len(arr) < Nb):
+            #pass#arr = arr + 
+            arr = np.concatenate([arr, np.zeros(Nb - len(arr))])
+        ofdm = np.fft.ifft(arr, Nb)
+        ofdm = np.concatenate([ofdm[Nb-N_interval:Nb], np.zeros(Nb - len(arr))])
+        #print(ofdm_data)
+        #print("i = ", i, "len= ", len(arr))
+        ofdm_data = np.concatenate([ofdm_data, ofdm]) 
+    return ofdm_data
+    
+def norm_corr(x, y):
+    x_norm = (x - np.mean(x)) / np.std(x)
+    y_norm = (y - np.mean(y)) / np.std(y)
+    corrR = np.vdot(x_norm.real, y_norm.real) / (np.linalg.norm(x_norm.real) * np.linalg.norm(y_norm.real))
+    corrI = np.vdot(x_norm.imag, y_norm.imag) / (np.linalg.norm(x_norm.imag) * np.linalg.norm(y_norm.imag))
+    
+    return max(corrR, corrI)    
 
-
+def del_prefix_while(data, Nb, N_interval):
+    out_data = np.array([])
+    for i in range(N_interval, data.size, Nb):
+        print(i)
+        #out_data += data[i:i + Nb]
+        out_data = np.concatenate([out_data, data[i:i + Nb]])
+        pass
+    return out_data
