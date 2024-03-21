@@ -65,36 +65,80 @@ def encode_QAM(data_bit, N):#[0, 1, 0, 1, ....], уровень QAM
     return sample
 
 
-def OFDM_modulator(data, Nb, N_interval):
+def OFDM_modulator(data, Nb, N_interval, symbol_ofdm):
     data = np.array(data)
     ofdm_data = []
-    
-    print("len = ", len(data))
+    #step = 
+    print("len input = ", len(data))
+    count_ofdm = 0
     for i in range(0, len(data), Nb):
         arr = data[i : i + Nb]
         if(len(arr) < Nb):
             #pass#arr = arr + 
+            print("Добивание:", Nb - len(arr))
             arr = np.concatenate([arr, np.zeros(Nb - len(arr))])
-        ofdm = np.fft.ifft(arr, Nb)
-        ofdm = np.concatenate([ofdm[Nb-N_interval:Nb], np.zeros(Nb - len(arr))])
+            
+        
+        
+        ofdm = np.fft.ifft(arr)
+        ofdm = np.concatenate([ofdm[len(ofdm) - N_interval:], ofdm])
+        #ofdm = np.concatenate([ofdm, np.zeros(Nb - len(arr))])
         #print(ofdm_data)
         #print("i = ", i, "len= ", len(arr))
         ofdm_data = np.concatenate([ofdm_data, ofdm]) 
+        count_ofdm += 1
+    print("Count ofdm:", count_ofdm)
+    print("len out = ", len(ofdm_data))
     return ofdm_data
     
-def norm_corr(x, y):
+def norm_corr1(x, y):
     x_norm = (x - np.mean(x)) / np.std(x)
     y_norm = (y - np.mean(y)) / np.std(y)
     corrR = np.vdot(x_norm.real, y_norm.real) / (np.linalg.norm(x_norm.real) * np.linalg.norm(y_norm.real))
     corrI = np.vdot(x_norm.imag, y_norm.imag) / (np.linalg.norm(x_norm.imag) * np.linalg.norm(y_norm.imag))
     
     return max(corrR, corrI)    
+def norm_corr(x,y):
+    #x_normalized = (cp1 - np.mean(cp1)) / np.std(cp1)
+    #y_normalized = (cp2 - np.mean(cp2)) / np.std(cp2)
+
+    c_real = np.vdot(x.real, y.real) / (np.linalg.norm(x.real) * np.linalg.norm(y.real))
+    c_imag = np.vdot(x.imag, y.imag) / (np.linalg.norm(x.imag) * np.linalg.norm(y.imag))
+    
+    return c_real+1j*c_imag
+
+
+def correlat_ofdm(rx_ofdm, cp,num_carrier):
+    max = 0
+    rx1 = rx_ofdm
+    cor = []
+    cor_max = []
+    for j in range(len(rx1)):
+        corr_sum =abs(norm_corr(rx1[:cp],np.conjugate(rx1[num_carrier:num_carrier+cp])))
+        #print(corr_sum)
+        cor.append(corr_sum)
+        if corr_sum > max and (corr_sum.imag > 0.9 or corr_sum.real > 0.9):
+            cor_max.append(corr_sum)
+            max = corr_sum
+            #print(np.round(max))
+            index = j
+        rx1= np.roll(rx1,-1)
+
+    cor  = np.asarray(cor)
+    #ic(cor_max)
+    #plt.figure(3)
+    #plt.plot(cor.real)
+    #plt.plot(cor.imag)
+    #print("ind",index)
+    #return (index - (cp+num_carrier))
+    return index
 
 def del_prefix_while(data, Nb, N_interval):
     out_data = np.array([])
-    for i in range(N_interval, data.size, Nb):
-        print(i)
+    print("Длинна входных данных",len(data))
+    for i in range(N_interval, len(data), Nb):
+        #print(i)
         #out_data += data[i:i + Nb]
         out_data = np.concatenate([out_data, data[i:i + Nb]])
-        pass
+        
     return out_data

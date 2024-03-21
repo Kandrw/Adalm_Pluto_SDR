@@ -108,7 +108,7 @@ if(PLATFORM == "Win"):
     module_gen_header += ".exe"
 
     
-data = "tESTadfasfasdfsdf"
+data = "e"
 
 file = open(argvs[0], "w")
 file.write(data)
@@ -125,8 +125,8 @@ data_bin = list(map(int, data_bin))
 for i in data_bin:
     print(i, end="")
 
-data = np.random.randint(0, 2, 200)
-data_bin = data
+#data = np.random.randint(0, 2, 200)
+#data_bin = data
 plt.figure(1, figsize=(10, 10))
 plt.subplot(2, 2, 1)
 plt.title("Data")
@@ -138,7 +138,7 @@ N_qam = 4
 data_qpsk = np.array(sample.encode_QAM(data_rep, N_qam))
 #data_qpsk = sample.encode_QPSK(data_rep, 4)
 N2 = 10#длительность символа
-data_qpsk = sample.duplication_sample(data_qpsk, N2)
+#data_qpsk = sample.duplication_sample(data_qpsk, N2)
 #Количество поднесущих
 Nb = 64
 #Защитный интервал
@@ -148,7 +148,7 @@ fs = sample_rate
 rs=100000
 ns=fs//rs
 
-
+symbol_ofdm = 0.7 + 0.7j
 
 
 data_qpsk = np.array(data_qpsk)
@@ -255,20 +255,22 @@ plt.scatter(data_qpsk.real, data_qpsk.imag)
 
 
 
+IF_SDR = False
+IF_SDR = True
+
+if IF_SDR:
+    sdr = adi.Pluto('ip:192.168.3.1')
+    
+    sdr2 = sdr
+    #sdr2 = adi.Pluto('ip:192.168.3.1')
+
+    
+    config_(sdr)
+    config_(sdr2)
 
 
-sdr = adi.Pluto('ip:192.168.2.1')
-
-sdr2 = sdr
-#sdr2 = adi.Pluto('ip:192.168.3.1')
-
-
-config_(sdr)
-config_(sdr2)
-
-
-sdr.rx_buffer_size =2*len(data_qpsk) *4
-sdr2.rx_buffer_size =2*len(data_qpsk) *4
+    sdr.rx_buffer_size =2*len(data_qpsk) *40
+    sdr2.rx_buffer_size =2*len(data_qpsk) *40
 
 CON = 1
 
@@ -276,7 +278,7 @@ if CON == 1:
     #OFDM
     Nc = N_qam
     #xt2 = data_qpsk
-    xt2 = sample.OFDM_modulator(data_qpsk, Nb, N_interval)
+    xt2 = sample.OFDM_modulator(data_qpsk, Nb, N_interval, symbol_ofdm)
     #xt2 = np.fft.ifft(data_qpsk, Nc)
     #sdr.tx(data_qpsk)
     plt.figure(12, figsize=(10, 10))
@@ -285,52 +287,83 @@ if CON == 1:
     plt.title("OFDM")
     plt.plot(abs(xt2))
     #sys.exit()
-   
-    sdr.rx_buffer_size =2*len(xt2) *4
-    sdr2.rx_buffer_size =2*len(xt2) *4
+    print("Отправлено:", len(xt2))
+    if IF_SDR:
+        sdr.rx_buffer_size =2*len(xt2) * 40
+        sdr2.rx_buffer_size =2*len(xt2) * 40
+        
+        sdr.tx(xt2)
     
-    sdr.tx(xt2)
     
-    
-    data_read = sdr2.rx()
-    sdr.tx_destroy_buffer()
-    sdr.rx_destroy_buffer()
-    sdr2.tx_destroy_buffer()
-    sdr2.rx_destroy_buffer()
+        data_read = sdr2.rx()
+    else:
+        data_read = xt2
+    if IF_SDR:
+        sdr.tx_destroy_buffer()
+        sdr.rx_destroy_buffer()
+        sdr2.tx_destroy_buffer()
+        sdr2.rx_destroy_buffer()
     data_read2 = data_read
+    
+    index1 = sample.correlat_ofdm(data_read2, N_interval, Nb)
+    print("index1:", index1)
+    
     arr = []
     start_data = -1
-    if_start = 0.7
+    if_start = 0.9
     for i in range(0, len(data_read2)):
-        data_read2 = np.roll(data_read2, -1)
+        
         #a = np.vdot(data_read2[0:N_interval], data_read2[Nb:Nb + N_interval])
-        a = sample.norm_corr(data_read2[0:N_interval], data_read2[Nb:Nb + N_interval])
+        a = sample.norm_corr(data_read2[0:N_interval], 
+                             data_read2[Nb:Nb + N_interval])
+        a = abs(a)
         if start_data == -1 and if_start <= a:
             start_data = i
         arr.append(a)
-        
+        data_read2 = np.roll(data_read2, -1)
     plt.subplot(2, 2, 2)
     plt.title("Correlation")
     plt.plot(arr)
+    #start_data = 0
     
     print("Начало данных:", start_data)
-    data_read = data_read[start_data]
-    
-    data = sample.del_prefix_while(data_read, Nb, N_interval)
-    print(data)
-    sys.exit()
-    
-    n = 3
-    data_readF = np.fft.fft(data_read, n)
-    #data_read = data_readF
-    data_read = np.convolve(np.ones(N2), data_read)/1000
-    indexs = TED_loop_filter(data_read)
-    
-    #data_read = data_read[indexs]
-    data_read1 = PLL(data_read)
-
+    data = data_read[start_data:start_data + len(xt2)]
+    data = sample.del_prefix_while(data, Nb, N_interval)
+    data2 = data_read[index1:index1 + len(xt2)]
+    data2 = sample.del_prefix_while(data2, Nb, N_interval)
     
     plt.figure(5, figsize=(10, 10))
+    plt.subplot(2, 2, 1)
+    plt.title("data_read")
+    plt.scatter(data_read.real, data_read.imag)
+    
+    plt.subplot(2, 2, 2)
+    plt.title("data")
+    plt.scatter(data.real, data.imag)
+    plt.scatter(data2.real, data2.imag)
+    
+    
+    n = 3
+    data_readF = np.fft.fft(data)
+    data_readF2 = np.fft.fft(data2)
+    
+    #data_read = data_readF
+    #data = np.convolve(np.ones(N2), data_readF)/1000
+    plt.subplot(2, 2, 3)
+    plt.title("data_readF")
+    plt.scatter(data_readF.real, data_readF.imag)
+    plt.scatter(data_readF2.real, data_readF2.imag)
+    
+    
+    #sys.exit()
+    
+    #indexs = TED_loop_filter(data_read)
+    
+    #data_read = data_read[indexs]
+    data_read1 = PLL(data)
+
+    
+    plt.figure(10, figsize=(10, 10))
     plt.subplot(2, 2, 1)
     plt.title("Принятый сигнал")
     plt.scatter(data_read.real, data_read.imag)
@@ -340,7 +373,11 @@ if CON == 1:
     
     plt.subplot(2, 2, 3)
     plt.title("Обработанный сигнал")
+    plt.scatter(data.real, data.imag)
+    plt.subplot(2, 2, 4)
+    plt.title("Обработанный сигнал")
     plt.scatter(data_read1.real, data_read1.imag)
+    
     plt.show()
 
 elif CON == 2:
