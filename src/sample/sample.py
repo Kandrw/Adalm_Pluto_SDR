@@ -65,31 +65,58 @@ def encode_QAM(data_bit, N):#[0, 1, 0, 1, ....], уровень QAM
     return sample
 
 
-def OFDM_modulator(data, Nb, N_interval, symbol_ofdm):
+def OFDM_modulator(data, Nb, N_interval, symbol_ofdm, RS, Nz):
     data = np.array(data)
-    ofdm_data = []
+    ofdm_data = np.array([])
+    
     #step = 
     print("len input = ", len(data))
     count_ofdm = 0
+    ofdm_indexes = [0]
+    zeros_nz = np.zeros(Nz)
     for i in range(0, len(data), Nb):
         arr = data[i : i + Nb]
         if(len(arr) < Nb):
             #pass#arr = arr + 
             print("Добивание:", Nb - len(arr))
             arr = np.concatenate([arr, np.zeros(Nb - len(arr))])
-            
+        print("len arr = ", len(arr))
+        
+        ofdm = np.array([symbol_ofdm])
+        ofdm = np.concatenate([zeros_nz, ofdm])
+        
+        for i2 in range(0, len(arr), RS):
+            sub = arr[i2:i2+RS]
+            print("sub = ", len(sub))
+            if(len(sub) < RS):
+                sub = np.concatenate([sub, np.zeros(RS - len(sub))])
+                print("sub2 = ", len(sub))
+            sub = np.concatenate([sub, np.array([symbol_ofdm])])
+            ofdm = np.concatenate([ofdm, sub])
+            if(i == 0 and i2 != 0):
+                ofdm_indexes.append(len(ofdm_indexes) + i2)
+        ofdm_indexes.append( len(ofdm) - 1)
+        ofdm = np.concatenate([ofdm, zeros_nz])
+        #arr = np.concatenate([np.array([symbol_ofdm]), arr])
         
         
-        ofdm = np.fft.ifft(arr)
+        
+        print("len arr = ", len(arr), "len ofdm = ", len(ofdm))
+        print(ofdm_indexes)
+        ofdm = np.fft.ifft(ofdm)
         ofdm = np.concatenate([ofdm[len(ofdm) - N_interval:], ofdm])
+        
         #ofdm = np.concatenate([ofdm, np.zeros(Nb - len(arr))])
         #print(ofdm_data)
         #print("i = ", i, "len= ", len(arr))
-        ofdm_data = np.concatenate([ofdm_data, ofdm]) 
+        
+        #ofdm_data = np.concatenate([ofdm_data, ofdm]) 
         count_ofdm += 1
+        ofdm_data = np.concatenate([ofdm_data, ofdm])
     print("Count ofdm:", count_ofdm)
     print("len out = ", len(ofdm_data))
-    return ofdm_data
+    argv = [ofdm_data, count_ofdm, ofdm_indexes]
+    return argv
     
 def norm_corr1(x, y):
     x_norm = (x - np.mean(x)) / np.std(x)
@@ -113,6 +140,7 @@ def correlat_ofdm(rx_ofdm, cp,num_carrier):
     rx1 = rx_ofdm
     cor = []
     cor_max = []
+    index = -1
     for j in range(len(rx1)):
         corr_sum =abs(norm_corr(rx1[:cp],np.conjugate(rx1[num_carrier:num_carrier+cp])))
         #print(corr_sum)
@@ -124,7 +152,7 @@ def correlat_ofdm(rx_ofdm, cp,num_carrier):
             index = j
         rx1= np.roll(rx1,-1)
 
-    cor  = np.asarray(cor)
+    #cor = np.asarray(cor)
     #ic(cor_max)
     #plt.figure(3)
     #plt.plot(cor.real)
