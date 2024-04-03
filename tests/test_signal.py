@@ -74,10 +74,10 @@ plt.scatter(data_qpsk.real, data_qpsk.imag)
 h1 = np.ones(N)
 # Noise
 pos_read = 0
-noise_coef = 0.0001
+noise_coef = 0.06
 data_noise = data_qpsk[0:] 
 noise = np.random.normal(0, noise_coef, len(data_noise))
-#data_noise += noise
+data_noise += noise
 
 plt.subplot(2, 2, 4)
 plt.title(f"BPSK + noise({noise_coef})")
