@@ -172,43 +172,32 @@ if READ_FILE == 0:
 
         #OFDM
     Nc = N_qam
-    #xt2 = data_qpsk
     ofdm_argv = sample.OFDM_modulator(data_qpsk, Nb, N_interval, pilot, RS, Nz)
-    print("OFDM demolator")
-    sample.OFDM_demodulator(ofdm_argv[0], ofdm_argv[1:], Nb, N_interval, pilot, RS, Nz)
-    EXIT()
     ofdm_tx = ofdm_argv[0]
     count_ofdm = ofdm_argv[1]
-    ofdm_indexes = ofdm_argv[2]
-    #xt2 = np.fft.ifft(data_qpsk, Nc)
-    #sdr.tx(data_qpsk)
-    
+    #ofdm_indexes = ofdm_argv[2]
     plt.figure(12, figsize=(10, 10))
     plt.subplot(2, 2, 1)
-    #xt2 = np.concatenate([xt2, np.zeros(4000)])
     plt.title("OFDM, count " + str(ofdm_argv[1]))
     plt.plot(abs(np.fft.fft(ofdm_tx,int(1e6))))
     len_data_tx = len(ofdm_tx)
     len_one_ofdm = int(len_data_tx / count_ofdm)
     print("len_data_tx = ", len_data_tx)
-    ## BLOCK 2 - настройка SDR (21-30)
+    
+    
     
     if IF_SDR:
+        ## BLOCK 2 - настройка SDR (21-30)
         print("BLOCK 2")
         import adi
         sdr = adi.Pluto('ip:192.168.3.1')
         
         sdr2 = sdr
         #sdr2 = adi.Pluto('ip:192.168.3.1')
-
-        
         config_(sdr)
         config_(sdr2)
-
         sdr.rx_buffer_size =2*len(data_qpsk) *40
         sdr2.rx_buffer_size =2*len(data_qpsk) *40
-
-
 
     ## BLOCK 3 - отправка сигнала (31-40)
     print("BLOCK 3")
@@ -222,17 +211,29 @@ if READ_FILE == 0:
         print("Add noise")
         plt.figure(31, figsize = (10, 10))
         
-        e = 4
+        e = 50
+        e_no_data = 1000
         np.random.normal
-        start_t_data = 20
-        len_end = 150
+        start_t_data = 40
+        len_end = 50
         noise = np.random.normal(loc=-e, scale=e, size= start_t_data + len(ofdm_tx) + len_end)
         noise = noise + noise * 1j
+        
         plt.subplot(2, 2, 1)
         plt.title("Noise")
         plt.plot(noise)
-        ofdm_rx = ofdm_tx / 100
-        ofdm_rx = np.concatenate([np.zeros(start_t_data), ofdm_rx, np.zeros(len_end)])
+        ofdm_rx = ofdm_tx #/ 50
+        noise_s = np.random.normal(loc=-e, scale=e, size= start_t_data + len(ofdm_tx) + len_end)
+        noise = noise + noise * 1j
+        if 1:
+            t_s = np.random.normal(loc=-e_no_data, scale=e_no_data, size= start_t_data)
+            t_s = t_s + t_s * 1j
+            t_e = np.random.normal(loc=-e_no_data, scale=e_no_data, size= len_end)
+            t_e = t_e + t_e * 1j
+        else:
+            t_s = np.zeros(start_t_data, dtype="complex_")
+            t_e = np.zeros(len_end, dtype="complex_")
+        ofdm_rx = np.concatenate([t_s, ofdm_rx, t_e])
         if 1:
             ofdm_rx += noise
         plt.subplot(2, 2, 2)
@@ -296,70 +297,33 @@ if CON == 1:
     plt.subplot(2, 2, 1)
     plt.title("Correlation")
     plt.plot(arr)
-    #start_data = 0
-    #start_data = 100
-    start_data += 1
+    if(start_data == -1):
+        print("не удалось определить начало")
+        EXIT()
     print("Начало данных:", start_data)
+    #start_data = 19
     #EXIT(1)
     data_rx = ofdm_rx[start_data:start_data + len_data_tx]
-    # data_rx = sample.del_prefix_while(data_rx, Nb, N_interval)
-    # data_rx2 = data_rx[index1:index1 + len_data_tx]
-    # data_rx2 = sample.del_prefix_while(data_rx2, Nb, N_interval)
-     
     plt.figure(52, figsize=(10, 10))
     plt.subplot(2, 2, 1)
     plt.title("data_rx")
     plt.scatter(ofdm_rx.real, ofdm_rx.imag)
-    
+
+    #EXIT()
+    print("OFDM demodulator")
+    data_decode = sample.OFDM_demodulator(data_rx, ofdm_argv[1:], Nb, N_interval, pilot, RS, Nz)
+    print("len data_decode = ", len(data_decode))
+    plt.figure(52, figsize=(10, 10))
     plt.subplot(2, 2, 2)
     plt.title("data")
-    #plt.scatter(data.real, data.imag)
-    #plt.scatter(data_rx2.real, data_rx2.imag)
-
-    data_decode = sample.OFDM_demodulator(data_rx, Nb, N_interval, symbol_ofdm, len_data_tx / count_ofdm, count_ofdm, RS, Nz, ofdm_indexes)
-    data_decode = np.array(data_decode)
-    print("len data_decode = ", len(data_decode))
     plt.scatter(data_decode.real, data_decode.imag)
-
-
-
-    EXIT()
-    n = 3
-    data_readF = np.fft.fft(data)
-    data_readF2 = np.fft.fft(data2)
-    
-    #data_read = data_readF
-    #data = np.convolve(np.ones(N2), data_readF)/1000
     plt.subplot(2, 2, 3)
-    plt.title("data_readF")
-    plt.scatter(data_readF.real, data_readF.imag)
-    plt.scatter(data_readF2.real, data_readF2.imag)
-    
+    plt.title("data, No FR")
+    data_decode_nfr = sample.OFDM_demodulator_NO_FR(data_rx, ofdm_argv[1:], Nb, N_interval, pilot, RS, Nz)
+    print("len data_decode_nfr = ", len(data_decode_nfr))
+    plt.scatter(data_decode_nfr.real, data_decode_nfr.imag)
     EXIT()
-    #EXIT()
-    
-    #indexs = TED_loop_filter(data_read)
-    
-    #data_read = data_read[indexs]
-    data_read1 = PLL(data)
 
-    
-    plt.figure(53, figsize=(10, 10))
-    plt.subplot(2, 2, 1)
-    plt.title("Принятый сигнал")
-    plt.scatter(data_read.real, data_read.imag)
-    plt.subplot(2, 2, 2)
-    plt.plot(data_read.real)
-    plt.plot(data_read.imag)
-    
-    plt.subplot(2, 2, 3)
-    plt.title("Обработанный сигнал")
-    plt.scatter(data.real, data.imag)
-    plt.subplot(2, 2, 4)
-    plt.title("Обработанный сигнал")
-    plt.scatter(data_read1.real, data_read1.imag)
-    
-    plt.show()
 
 elif CON == 2:
     #Не доработано или удалить
@@ -370,10 +334,10 @@ elif CON == 2:
     data_readF = np.fft.fft(data_read, n)
     data_read = data_readF
     data_read = np.convolve(np.ones(N2), data_read)/1000
-    indexs = TED_loop_filter(data_read)
+    indexs = sample.TED_loop_filter(data_read)
     
     data_read = data_read[indexs]
-    data_read1 = PLL(data_read)
+    data_read1 = sample.PLL(data_read)
     #data_read = data_read/np.mean(data_read**2)
     #data_read_1 = data_read
     

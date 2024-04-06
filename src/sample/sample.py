@@ -1,5 +1,11 @@
 import numpy as np
+import math
+import matplotlib.pyplot as plt
+import scipy
 
+DEBUG = True
+DEBUG_OFDM = False
+DEBUG_OFDM_DE = False
 
 #Строку символов в бинарный вид
 def data_to_byte(data):
@@ -52,7 +58,7 @@ def encode_QAM(data_bit, N):#[0, 1, 0, 1, ....], уровень QAM
         return
     sample = [] # массив комплексных чисел
     k1 = calc_coeff(int(np.log2(N))/2)
-    print("k1 = ", k1)
+    #print("k1 = ", k1)
     for i in range(0, len(data_bit), int(np.log2(N))):
         sr = data_bit[i:i+int(np.log2(N))]
         sr = list(reversed(sr))
@@ -65,59 +71,204 @@ def encode_QAM(data_bit, N):#[0, 1, 0, 1, ....], уровень QAM
     return sample
 
 
-def OFDM_modulator(data, Nb, N_interval, symbol_ofdm, RS, Nz):
-    data = np.array(data)
-    ofdm_data = np.array([])
-    
-    #step = 
-    print("len input = ", len(data))
+
+#Данные, количество поднесущих, защитный префикс, pilot, шаг расположения pilot, защитный интревал
+def OFDM_modulator(data, Nb, N_interval, pilot, Rs, Nz):    
+    Rs += 1
+    ofdms = np.array([])
+    ofdm_indexes = []
+    step = Nb - Nz * 2
+    Nrs = int(step / Rs)
+    if(step % Rs != 0):
+        Nrs += 1
+    step_data = step - Nrs
+    if(DEBUG_OFDM):
+        print("Длинна входных данных: ", len(data))
+        print("Rs = ", Rs, "N_prefix = ", N_interval)
+        print("step = ", step)
+        print("Nrs = ", Nrs)
+        print("step_data = ", step_data)
+    for i in range(step):
+        if(i % Rs == 0):
+            ofdm_indexes.append(i)
     count_ofdm = 0
-    ofdm_indexes = [0]
-    zeros_nz = np.zeros(Nz)
-    for i in range(0, len(data), Nb):
-        arr = data[i : i + Nb]
-        if(len(arr) < Nb):
-            #pass#arr = arr + 
-            print("Добивание:", Nb - len(arr))
-            arr = np.concatenate([arr, np.zeros(Nb - len(arr))])
-        print("len arr = ", len(arr))
-        
-        ofdm = np.array([symbol_ofdm])
-        ofdm = np.concatenate([zeros_nz, ofdm])
-        
-        for i2 in range(0, len(arr), RS):
-            sub = arr[i2:i2+RS]
-            print("sub = ", len(sub))
-            if(len(sub) < RS):
-                sub = np.concatenate([sub, np.zeros(RS - len(sub))])
-                print("sub2 = ", len(sub))
-            sub = np.concatenate([sub, np.array([symbol_ofdm])])
-            ofdm = np.concatenate([ofdm, sub])
-            if(i == 0 and i2 != 0):
-                ofdm_indexes.append(len(ofdm_indexes) + i2)
-        ofdm_indexes.append( len(ofdm) - 1)
-        ofdm = np.concatenate([ofdm, zeros_nz])
-        #arr = np.concatenate([np.array([symbol_ofdm]), arr])
-        
-        
-        
-        print("len arr = ", len(arr), "len ofdm = ", len(ofdm))
-        print(ofdm_indexes)
-        ofdm = np.fft.ifft(ofdm)
-        ofdm = np.concatenate([ofdm[len(ofdm) - N_interval:], ofdm])
-        
-        #ofdm = np.concatenate([ofdm, np.zeros(Nb - len(arr))])
-        #print(ofdm_data)
-        #print("i = ", i, "len= ", len(arr))
-        
-        #ofdm_data = np.concatenate([ofdm_data, ofdm]) 
-        count_ofdm += 1
-        ofdm_data = np.concatenate([ofdm_data, ofdm])
-    print("Count ofdm:", count_ofdm)
-    print("len out = ", len(ofdm_data))
-    argv = [ofdm_data, count_ofdm, ofdm_indexes]
-    return argv
     
+    for i in range(0, len(data), step_data):
+        part = data[i:i + step_data]
+        if(len(part) < step_data):
+            if(DEBUG_OFDM):
+                print("Добивание:", step_data - len(part))
+            ending =  np.zeros(step_data - len(part), dtype="complex_")
+            #ending += 14 + 14j
+            part = np.concatenate([part, ending])
+        if(DEBUG_OFDM):
+            print("len part = ", len(part))
+        ofdm = np.zeros(step, dtype="complex_")
+        if(DEBUG_OFDM):
+            print("len do Nz:", ofdm.size)
+        i2 = 0
+        for i3 in range(ofdm.size):
+            if(i3 % Rs == 0):
+                ofdm[i3] = pilot
+                if(DEBUG_OFDM):
+                    print(i3, end=", ")
+                
+            else:
+                ofdm[i3] = part[i2]
+                i2 += 1
+        if(DEBUG_OFDM):
+            print()
+            print(ofdm)
+        interval_zeros = np.zeros(Nz, dtype="complex_")
+        ofdm = np.concatenate([interval_zeros, ofdm, interval_zeros])
+        if(DEBUG_OFDM):    
+            print("len ofdm complete", len(ofdm))
+        ofdm = np.fft.ifft(ofdm)
+        if(DEBUG_OFDM):
+            print("len ofdm to time:", len(ofdm))
+        ofdm = np.concatenate([ofdm[len(ofdm) - N_interval:], ofdm])
+        if(DEBUG_OFDM):    
+            print("len prefix + ofdm: ", len(ofdm))
+            
+        # plt.figure(100 + (i * 2), figsize=(10, 10))
+        # plt.subplot(2, 2, 1)
+        # plt.plot(ofdm)
+        # plt.subplot(2, 2, 2)
+        # plt.plot(abs(np.fft.fft(ofdm,int(1e6))))
+        
+        ofdms = np.concatenate([ofdms, ofdm])
+        count_ofdm += 1
+    if(DEBUG_OFDM):
+        print(ofdm_indexes)
+        print("count ofdm = ", count_ofdm)
+        print("len ofdms = ", len(ofdms))
+    param = [step, step_data, Nrs]
+    return [ofdms, count_ofdm, ofdm_indexes, param]
+        
+#  оценка АЧХ
+def assessment_FR(Rrx, Rtx, indexes, len_inter):
+    H = Rrx / Rtx
+    # plt.figure(53 + s, figsize=(10, 10))
+    # plt.subplot(2, 2, 1)
+    # plt.plot(H)
+    indexes = np.array(indexes)
+    ts = np.linspace(0, len_inter, len_inter)
+    Heq = np.interp(ts, indexes, H)
+    # plt.subplot(2, 2, 2)
+    # plt.plot(Heq)
+    #print("Heq ", len(Heq), "  ",Heq)
+    return Heq
+    
+##  ofdms_argv = [count_ofdm, ofdm_indexes, param]
+def OFDM_demodulator(ofdms, ofdms_argv, Nb, N_interval, pilot, Rs, Nz):
+    if(DEBUG_OFDM_DE):
+        print(len(ofdms_argv))
+        print("Nb = ", Nb, "N_prefix = ", N_interval)
+    step = Nb + N_interval
+    count_ofdm = 0
+    data = np.array([])
+    for i in range(0, len(ofdms), step):
+        if(DEBUG_OFDM_DE):
+            print("i = ", i)
+        ofdm= ofdms[i : i + step]
+        if(DEBUG_OFDM_DE):
+            print("len ofdm = ", len(ofdm), "[", i, ":", i + step, "]")
+        ofdm = ofdm[N_interval:]
+        if(DEBUG_OFDM_DE):
+            print("len ofdm, delete prefix:", len(ofdm))
+        
+        ofdm = np.fft.fft(ofdm)
+        ofdm = ofdm[Nz:len(ofdm)-Nz]
+        if(DEBUG_OFDM_DE):
+            print("len ofdm, delete zeros: ", len(ofdm))
+        Rtx = np.array([pilot for i in range(len(ofdms_argv[1]))])
+        Rrx = []
+        for i2 in range(0, len(ofdm), Rs+1):
+            if(DEBUG_OFDM_DE):
+                print(i2, end=" ")
+            Rrx.append(ofdm[i2])
+        if(DEBUG_OFDM_DE):
+            print()     
+        Rrx = np.array(Rrx)
+        if(DEBUG_OFDM_DE):
+            print(Rrx)
+            print("Оценка АЧХ")
+        Heq = assessment_FR(Rrx, Rtx, ofdms_argv[1], len(ofdm))
+        
+        ofdm = ofdm / Heq
+        if(DEBUG_OFDM_DE):
+            print("После АЧХ")
+            Rrx = []
+            for i2 in range(0, len(ofdm), Rs+1):
+                print(i2, end=" ")
+                Rrx.append(ofdm[i2])
+            print()   
+            Rrx = np.array(Rrx)
+            print(Rrx)
+        de_ofdm = []
+        i3 = 0
+        for i2 in range(len(ofdm)):
+            #print("i2 = ", i2, " i3 = ", i3)
+            if(i3 < len(ofdms_argv[1]) and i2 == ofdms_argv[1][i3]):
+                i3 += 1
+            else:
+                #print("add ", i2)
+                de_ofdm.append(ofdm[i2])
+        de_ofdm = np.array(de_ofdm)
+        data = np.concatenate([data, de_ofdm])
+        count_ofdm += 1
+        if(count_ofdm == ofdms_argv[0]):
+            break
+    return data
+##  ofdms_argv = [count_ofdm, ofdm_indexes, param]
+def OFDM_demodulator_NO_FR(ofdms, ofdms_argv, Nb, N_interval, pilot, Rs, Nz):
+    if(DEBUG_OFDM_DE):
+        print(len(ofdms_argv))
+        print("Nb = ", Nb, "N_prefix = ", N_interval)
+    step = Nb + N_interval
+    count_ofdm = 0
+    data = np.array([])
+    for i in range(0, len(ofdms), step):
+        if(DEBUG_OFDM_DE):
+            print("i = ", i)
+        ofdm= ofdms[i : i + step]
+        if(DEBUG_OFDM_DE):
+            print("len ofdm = ", len(ofdm), "[", i, ":", i + step, "]")
+        ofdm = ofdm[N_interval:]
+        if(DEBUG_OFDM_DE):
+            print("len ofdm, delete prefix:", len(ofdm))
+        
+        ofdm = np.fft.fft(ofdm)
+        ofdm = ofdm[Nz:len(ofdm)-Nz]
+        if(DEBUG_OFDM_DE):
+            print("len ofdm, delete zeros: ", len(ofdm))
+        Rtx = np.array([pilot for i in range(len(ofdms_argv[1]))])
+        Rrx = []
+        for i2 in range(0, len(ofdm), Rs+1):
+            if(DEBUG_OFDM_DE):
+                print(i2, end=" ")
+            Rrx.append(ofdm[i2])
+        if(DEBUG_OFDM_DE):
+            print()   
+        Rrx = np.array(Rrx)
+        if(DEBUG_OFDM_DE):
+            print(Rrx)
+        de_ofdm = []
+        i3 = 0
+        for i2 in range(len(ofdm)):
+            #print("i2 = ", i2, " i3 = ", i3)
+            if(i3 < len(ofdms_argv[1]) and i2 == ofdms_argv[1][i3]):
+                i3 += 1
+            else:
+                #print("add ", i2)
+                de_ofdm.append(ofdm[i2])
+        de_ofdm = np.array(de_ofdm)
+        data = np.concatenate([data, de_ofdm])
+        count_ofdm += 1
+        if(count_ofdm == ofdms_argv[0]):
+            break
+    return data
+
 def norm_corr1(x, y):
     x_norm = (x - np.mean(x)) / np.std(x)
     y_norm = (y - np.mean(y)) / np.std(y)
@@ -134,6 +285,15 @@ def norm_corr(x,y):
     
     return c_real+1j*c_imag
 
+def norm_corr3(data, seq):
+    sum_c = 0
+    for i in range(len(seq)):
+        sum_c += data[i] * seq[i]
+    
+    a = data[:len(seq)]
+    #return sum_c / math.sqrt( sum(seq) * sum(data[step : step + len(seq)]) )
+    return sum_c / math.sqrt( sum(seq * seq) * sum(a * a ))
+  
 
 def correlat_ofdm(rx_ofdm, cp,num_carrier):
     max = 0
@@ -170,3 +330,85 @@ def del_prefix_while(data, Nb, N_interval):
         out_data = np.concatenate([out_data, data[i:i + Nb]])
         
     return out_data
+
+#=======================================================================================================================
+
+#Не преминяется для QAM16 
+def TED_loop_filter(data): #ted loop filter 
+    BnTs = 0.01 
+    Nsps = 10
+    C = np.sqrt(2)
+    Kp = 1
+    teta = ((BnTs)/(Nsps))/(C + 1/(4*C))
+    K1 = (-4*C*teta)/((1+2*C*teta+teta**2)*Kp)
+    K2 = (-4*teta**2)/((1+2*C*teta+teta**2)*Kp)
+    print("K1 = ", K1)
+    print("K2 = ", K2)
+    #K1_2 = (1/Kp)*((((4*C)/(Nsps**2))*((BnTs/(C + (1/4*C)))**2))/(1 + ((2 * C)/Nsps)*(BnTs/(C + (1/(4*C))))+(BnTs/(Nsps*(C+(1/4*C))))**2))
+    err = np.zeros(len(data)//10, dtype = "complex_")
+    data = np.roll(data,-0)
+    nsp = 10
+    p1 = 0
+    p2 = 0
+    n = 0
+    mass_cool_inex = []
+    mass_id = []
+    for ns in range(0,len(data)-(2*nsp),nsp):
+        #real = (data.real[ns+n] - data.real[nsp+ns+n]) * data.real[n+(nsp)//2+ns]
+        #imag = (data.imag[ns+n] - data.imag[nsp+ns+n]) * data.imag[n+(nsp)//2+ns]
+        real = (data.real[nsp+ns+n] - data.real[ns+n]) * data.real[n + (nsp)//2+ns]
+        imag = (data.imag[nsp+ns+n] - data.imag[ns+n] ) * data.imag[n + (nsp)//2+ns]
+        err[ns//nsp] = np.mean(real + imag)
+        #err[ns//nsp] = np.mean((np.conj(data[nsp+ns+n]) - np.conj(data[ns+n]))*(data[n + (nsp)//2+ns])) 
+        error = err.real[ns//nsp]
+        p1 = error * K1
+        p2 = p2 + p1 + error * K2
+        #print(ns ," p2 = ",p2)  
+        while(p2 > 1):
+            #print(ns ," p2 = ",p2)
+            p2 = p2 - 1
+        while(p2 < -1):
+            #print(ns ," p2 = ",p2)
+            p2 = p2 + 1
+        
+        n = round(p2*10)  
+        n1 = n+ns+nsp   
+        mass_cool_inex.append(n1)
+        mass_id.append(n)
+
+    #mass_cool_inex = [math.ceil(mass_cool_inex[i]) for i in range(len(mass_cool_inex))]
+    mass1 = np.asarray(mass_cool_inex)
+    mass = np.asarray(mass_id)
+    #plt.figure(10, figsize=(10, 10))
+    #plt.subplot(2,1,1)
+    #plt.plot(err) 
+    #plt.subplot(2,1,2)
+    #plt.plot(mass)   
+    
+    return mass1
+def PLL(conv):
+    mu = 1  
+    theta = 1
+    phase_error = np.zeros(len(conv))  
+    output_signal = np.zeros(len(conv), dtype=np.complex128)
+
+    for n in range(len(conv)):
+        theta_hat = np.angle(conv[n]) 
+        #print(theta_hat)
+        phase_error[n] = theta_hat - theta  
+        output_signal[n] = conv[n] * np.exp(-1j * theta)  
+        theta = theta + mu * phase_error[n]  
+    return output_signal
+
+
+
+def gardner_TED(data):
+    error = 0
+    tau = 2
+    t1 = 1
+    errors = [0 for i in range(len(data))]
+    for i in range(1, len(data)):
+        t1 = i
+        t2 = t1 + tau
+        errors[i] = (data.real[i-1]) % N
+    
