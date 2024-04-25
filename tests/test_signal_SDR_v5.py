@@ -65,6 +65,36 @@ def config_(sdr):
     #sdr.gain_control_mode_chan0 = "slow_attack"
     sdr.gain_control_mode_chan0 = "manual"
     
+def resource_grid_3(data1, Nfft, cp): 
+    """
+        data - matrix
+        count_frame - количество OFDM фреймов бля ресурсной сетки
+        len_frame - количество ofdm-символов в ofdm фрейме
+        Nftt - количество поднесущих
+        cp - защитный префикс
+
+    """
+    #data1 = data[:(Nfft)*len_frame*count_frames]
+    half_nfft = Nfft//2
+
+    # преобразуем в матрицу 
+    data_freq = data1.reshape(2, (Nfft+cp))
+
+    # обрезаем циклический префикс
+    data1 = data_freq[:, cp:]
+    # производим обратное преобразование фурье и транспонируем матрицу для удобного вывода на карте
+
+    data2 = np.fft.fft(data1).T
+
+    # переставляем строки местами из-за не шифтнутых частот
+    #temp = np.copy(data2[0:half_nfft, :])
+    #data2[0:half_nfft, :] = data2[half_nfft:Nfft, :]
+    #data2[half_nfft:Nfft, :] = temp
+
+    plt.figure()
+    plt.imshow(abs(data2), cmap='jet',interpolation='nearest', aspect='auto')
+    plt.colorbar()
+    #plt.show()
 
 
 #rf_module = conf.RxTx(adi.Pluto('ip:192.168.2.1'))
@@ -88,13 +118,16 @@ if 1:
     N2 = 10#длительность символа
     #data_qpsk = sample.duplication_sample(data_qpsk, N2)
     #Количество поднесущих
-    Nb = 32
+    Nb = 64
     #Защитный интервал
-    N_interval = 4
+    N_interval = 16
     RS = 4 # < Nb
-    Nz = 6 # < Nb
+    Nz = 10 # < Nb
     
-    pilot = 100009.7 + 100009.7j
+    #pilot = 100009.7 + 100009.7j
+    pilot = 18000.7 + 18000.7j
+    #pilot *= 2 ** 3
+    
 
 
 if READ_FILE == 0:
@@ -183,7 +216,10 @@ if READ_FILE == 0:
     len_data_tx = len(ofdm_tx)
     len_one_ofdm = int(len_data_tx / count_ofdm)
     print("len_data_tx = ", len_data_tx)
-    
+    #f1 = open(, "w")
+    np.savetxt("dla_ivana.txt", ofdm_tx.view(float))
+    #f1.write(str(ofdm_tx))
+    #f1.close()
     
     
     if IF_SDR:
@@ -200,6 +236,7 @@ if READ_FILE == 0:
         sdr2.rx_buffer_size =2*len(data_qpsk) *40
 
     ## BLOCK 3 - отправка сигнала (31-40)
+    resource_grid_3(ofdm_tx, Nb, N_interval)
     print("BLOCK 3")
     if IF_SDR:
         sdr.rx_buffer_size =2*len(ofdm_tx) * 40
@@ -312,6 +349,7 @@ if CON == 1:
     #EXIT()
     print("OFDM demodulator")
     data_decode = sample.OFDM_demodulator(data_rx, ofdm_argv[1:], Nb, N_interval, pilot, RS, Nz)
+    resource_grid_3(data_rx, Nb, N_interval)
     print("len data_decode = ", len(data_decode))
     plt.figure(52, figsize=(10, 10))
     plt.subplot(2, 2, 2)

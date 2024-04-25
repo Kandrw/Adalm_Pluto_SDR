@@ -114,7 +114,7 @@ def OFDM_modulator(data, Nb, N_interval, pilot, Rs, Nz):
                     print(i3, end=", ")
                 
             else:
-                ofdm[i3] = part[i2]
+                ofdm[i3] = part[i2] * 3# **14
                 i2 += 1
         if(DEBUG_OFDM):
             print()
@@ -143,6 +143,7 @@ def OFDM_modulator(data, Nb, N_interval, pilot, Rs, Nz):
         print("count ofdm = ", count_ofdm)
         print("len ofdms = ", len(ofdms))
     param = [step, step_data, Nrs]
+    #ofdms *= 2**14
     return [ofdms, count_ofdm, ofdm_indexes, param]
         
 #  оценка АЧХ
