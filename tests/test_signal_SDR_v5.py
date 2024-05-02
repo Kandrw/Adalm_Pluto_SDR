@@ -17,6 +17,7 @@ from scipy.fftpack import fft, ifft,  fftshift, ifftshift
 import matplotlib.pyplot as plt
 import subprocess
 import time
+import datetime
 
 import platform
 
@@ -35,14 +36,79 @@ import sample.sample as sample
 
 
 
+def norm_corr(x,y):
+    #x_normalized = (cp1 - np.mean(cp1)) / np.std(cp1)
+    #y_normalized = (cp2 - np.mean(cp2)) / np.std(cp2)
+
+    c_real = np.vdot(x.real, y.real) / (np.linalg.norm(x.real) * np.linalg.norm(y.real))
+    c_imag = np.vdot(x.imag, y.imag) / (np.linalg.norm(x.imag) * np.linalg.norm(y.imag))
+    
+    return c_real+1j*c_imag
+
+def indexs_of_CP_after_PSS(rx, cp, fft_len):
+    """
+    Возвращает массив начала символов (вместе с CP) (чтобы только символ был нужно index + 16)
+    """
+    corr = [] # Массив корреляции 
+
+    for i in range(len(rx) - fft_len):
+        o = norm_corr((rx[:cp]), rx[fft_len:fft_len+cp])
+
+        corr.append(abs(o))
+        rx = np.roll(rx, -1)
+
+    corr = np.array(corr) / np.max(corr) # Нормирование
+    max_len_cycle = len(corr)
+    # if corr[0] > 0.97:
+    #     max_len_cycle = len(corr)
+    # else:
+    #     max_len_cycle = len(corr)-(fft_len+cp)
+
+    ind = np.argmax(corr[0 : (fft_len+cp)// 2 ])
+    arr_index = [] # Массив индексов максимальных значений corr
+    arr_index.append(ind)
+    for i in range((fft_len+cp) // 2, max_len_cycle, (fft_len+cp)):
+        #print(i, i+(fft_len+cp))
+        max = np.max(corr[i : i+(fft_len+cp)])
+        if max > 0.90: 
+            ind = i + np.argmax(corr[i : i+(fft_len+cp)])
+            if ind < (len(corr)):
+                arr_index.append(ind)
+    
+    ### DEBUG
+    
+    # print(corr)
+    #plt.figure()
+    #plt.plot(abs(corr))
+    #plt.show()
+    return arr_index
+
+
+def indiv_symbols(ofdm, N_fft, CP_len):
+    cp = CP_len
+    all_sym = N_fft + cp
+    
+    
+    index = indexs_of_CP_after_PSS(ofdm, cp, N_fft)
+    index = index[:5]
+    symbols = []
+    for ind in index:
+        symbols.append(ofdm[ind+cp : ind+all_sym])
+        
+    return np.asarray(symbols)
+
+
+
 PLATFORM = platform.system()#"Linux"
 
 sample_rate  = 1000000
 
-IF_SDR = False
+IF_SDR = True
 READ_FILE = 0#Если True, то игнорируются блоки: 1, 2, 3, 4, сигнал считывается из файла
-
+COUNT_SDR = 1 # 1-2
 CON = 1# метод обработки сигнала (1, 2)
+IF_PSS = False
+
 
 filename_output = "input_qpsk.txt" #файл записи принятого сигнала
 
@@ -127,8 +193,11 @@ if 1:
     #pilot = 100009.7 + 100009.7j
     pilot = 18000.7 + 18000.7j
     #pilot *= 2 ** 3
-    
-
+    if IF_PSS:
+        pss = [0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 1]
+        
+        pss_fft = sample.PSS_to_freq(pss)
+        print("len pss = ", len(pss_fft))
 
 if READ_FILE == 0:
     ## BLOCK 1 - формирование сигнала (11 - 20)
@@ -212,43 +281,50 @@ if READ_FILE == 0:
     plt.figure(12, figsize=(10, 10))
     plt.subplot(2, 2, 1)
     plt.title("OFDM, count " + str(ofdm_argv[1]))
+    
     plt.plot(abs(np.fft.fft(ofdm_tx,int(1e6))))
     len_data_tx = len(ofdm_tx)
     len_one_ofdm = int(len_data_tx / count_ofdm)
     print("len_data_tx = ", len_data_tx)
     #f1 = open(, "w")
-    np.savetxt("dla_ivana.txt", ofdm_tx.view(float))
+    resource_grid_3(ofdm_tx, Nb, N_interval)
+    if IF_PSS:
+        ofdm_tx = sample.add_PSS(ofdm_tx, pss_fft)
+        
+    np.savetxt("data_save/tx" + str(datetime.datetime.now()) + ".txt", ofdm_tx.view(float))
     #f1.write(str(ofdm_tx))
     #f1.close()
     
     
     if IF_SDR:
         ## BLOCK 2 - настройка SDR (21-30)
-        print("BLOCK 2")
+        print("BLOCK 2: SDR")
         import adi
-        sdr = adi.Pluto('ip:192.168.3.1')
+        sdr = adi.Pluto('ip:192.168.2.1')
         
         sdr2 = sdr
-        #sdr2 = adi.Pluto('ip:192.168.3.1')
+        sdr2 = adi.Pluto('ip:192.168.3.1')
         config_(sdr)
         config_(sdr2)
         sdr.rx_buffer_size =2*len(data_qpsk) *40
         sdr2.rx_buffer_size =2*len(data_qpsk) *40
 
     ## BLOCK 3 - отправка сигнала (31-40)
-    resource_grid_3(ofdm_tx, Nb, N_interval)
+    
     print("BLOCK 3")
     if IF_SDR:
         sdr.rx_buffer_size =2*len(ofdm_tx) * 40
         sdr2.rx_buffer_size =2*len(ofdm_tx) * 40
-        sdr.tx(ofdm_tx)
         print("Отправлено:", len(ofdm_tx))
+        sdr.tx(ofdm_tx)
+        
+        #time.sleep(1)
     else:
         #Добавление шума
         print("Add noise")
         plt.figure(31, figsize = (10, 10))
         
-        e = 50
+        e = 80
         e_no_data = 1000
         np.random.normal
         start_t_data = 40
@@ -283,9 +359,9 @@ if READ_FILE == 0:
 
     ## BLOCK 4 - принятие сигнала  (41-50)
     if IF_SDR:
-        print("BLOCK 4")
+        print("BLOCK 4: rx SDR")
         ofdm_rx = sdr2.rx()
-        
+        np.savetxt("data_save/rx" + str(datetime.datetime.now()) + ".txt", ofdm_tx.view(float))
         np.savetxt(filename_output, ofdm_rx, delimiter=":")
         if IF_SDR:
             sdr.tx_destroy_buffer()
@@ -302,10 +378,40 @@ print("BLOCK 5")
 
 if CON == 1:
 
-    ofdm_rx_2 = ofdm_rx
+    
+
+
+    ofdm_rx_pss_calc = ofdm_rx.copy()
+
+    if IF_PSS:
+        start_data = -1
+        if_start = 0.9 + 0.9j
+        arr_cor_pos = []
+        for i in range(0, len(ofdm_rx_pss_calc) - len(pss_fft)):
+            
+            a = sample.norm_corr(ofdm_rx_pss_calc[0:len(pss_fft)], 
+                pss_fft)
+    
+            #if start_data == -1 and a.real >= abs(if_start.real) and a.imag >= abs(if_start.imag):
+            if start_data == -1 and abs(a) >= abs(if_start):
+            
+                start_data = i - len(pss_fft)
+                print("FFFFFFFff")
+            arr_cor_pos.append(a)
+            ofdm_rx_pss_calc = np.roll(ofdm_rx_pss_calc, -1)
+            
+        print("Начало PSS:", start_data)
+        plt.figure(50, figsize = (10, 10))
+        plt.subplot(2, 2, 1)
+        plt.title("Correlation PSS")
+        plt.plot(arr_cor_pos)
+    else:
+        start_data = 0
+    ofdm_rx_2 = ofdm_rx_pss_calc.copy()
     index1 = sample.correlat_ofdm(ofdm_rx_2, N_interval, Nb)
     print("index1:", index1)
-    
+    ofdm_rx_2 = ofdm_rx_pss_calc.copy()
+    ofdm_rx_2 = ofdm_rx_2[start_data:]
     arr = []
     start_data = -1
     if_start = 0.9 + 0.9j
@@ -313,6 +419,47 @@ if CON == 1:
     # print(N_interval, ":", Nb)
     print("0 :", N_interval)
     print(len_one_ofdm - N_interval, ":", len_one_ofdm)
+    
+    
+    #a2 = np.convolve()
+    if 0:
+        data = indiv_symbols(ofdm_rx_2, Nb, N_interval)
+        data = data.flatten()
+        plt.figure(61, figsize=(10, 10))
+        plt.subplot(2, 2, 1)
+        plt.title("data_rx")
+        plt.scatter(data.real, data.imag)
+        
+        data_decode = sample.OFDM_demodulator(data, ofdm_argv[1:], Nb, N_interval, pilot, RS, Nz)
+        plt.figure(62, figsize=(10, 10))
+        plt.subplot(2, 2, 2)
+        plt.title("data decode")
+        plt.scatter(data_decode.real, data_decode.imag)
+        plt.figure(63, figsize=(10, 10))
+        plt.subplot(2, 2, 1)
+        plt.title("OFDM, count " + str(ofdm_argv[1]))
+        plt.plot(abs(np.fft.fft(data_decode,int(1e6))))
+    #EXIT()
+    #if 0:
+    for i in range(0, len(ofdm_rx_2) - Nb):
+        
+        #a = np.vdot(data_read2[0:N_interval], data_read2[Nb:Nb + N_interval])
+       
+        a = sample.norm_corr(ofdm_rx_2[0:N_interval], 
+                             ofdm_rx_2[len_one_ofdm - N_interval: len_one_ofdm])
+        #a = abs(a)
+        #print("a = ", abs(a.real), abs(a.imag), end = " | ")
+        
+        if start_data == -1 and a.real >= abs(if_start.real) and a.imag > (if_start.imag):
+        #if start_data == -1 and a >= if_start:
+            start_data = i
+
+        # if start_data == -1 and -if_start <= a and a <= if_start:
+        #     start_data = i
+        arr.append(a)
+        ofdm_rx_2 = np.roll(ofdm_rx_2, -1)
+        
+        
     for i in range(0, len(ofdm_rx_2) - Nb):
         
         #a = np.vdot(data_read2[0:N_interval], data_read2[Nb:Nb + N_interval])

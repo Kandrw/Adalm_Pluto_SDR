@@ -332,6 +332,14 @@ def del_prefix_while(data, Nb, N_interval):
         
     return out_data
 
+def PSS_to_freq(pss):
+    pss_qpsk = np.array(encode_QAM(pss, 4))
+    
+    pss_f = np.fft.ifft(pss_qpsk)
+    return pss_f
+
+def add_PSS(ofdm, pss_f):
+    return np.concatenate([pss_f, ofdm])
 #=======================================================================================================================
 
 #Не преминяется для QAM16 
