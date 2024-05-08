@@ -103,11 +103,11 @@ PLATFORM = platform.system()#"Linux"
 
 sample_rate  = 1000000
 
-IF_SDR = True
+IF_SDR = False
 READ_FILE = 0#Если True, то игнорируются блоки: 1, 2, 3, 4, сигнал считывается из файла
 COUNT_SDR = 1 # 1-2
 CON = 1# метод обработки сигнала (1, 2)
-IF_PSS = False
+IF_PSS = True
 
 
 filename_output = "input_qpsk.txt" #файл записи принятого сигнала
@@ -189,12 +189,16 @@ if 1:
     N_interval = 16
     RS = 4 # < Nb
     Nz = 10 # < Nb
-    
+    pilot = 5009.7 + 5009.7j
+    pilot *= 3.2
     #pilot = 100009.7 + 100009.7j
-    pilot = 18000.7 + 18000.7j
+    #pilot = 18000.7 + 18000.7j
     #pilot *= 2 ** 3
     if IF_PSS:
-        pss = [0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 1]
+        pss = [0, 1, 1, 1, 0, 1, 0, 1, 0, 
+               0, 1, 0, 1, 0, 0, 0, 1, 0, 
+               1, 1, 1, 0, 0, 1, 1, 0, 1,
+               1, 0, 1, 1, 0, 0, 1, 0, 1]
         
         pss_fft = sample.PSS_to_freq(pss)
         print("len pss = ", len(pss_fft))
@@ -324,14 +328,15 @@ if READ_FILE == 0:
         print("Add noise")
         plt.figure(31, figsize = (10, 10))
         
-        e = 80
+        e = 8
         e_no_data = 1000
         np.random.normal
         start_t_data = 40
+        
         len_end = 50
         noise = np.random.normal(loc=-e, scale=e, size= start_t_data + len(ofdm_tx) + len_end)
         noise = noise + noise * 1j
-        
+        print("Позиция данных в канале:", start_t_data)
         plt.subplot(2, 2, 1)
         plt.title("Noise")
         plt.plot(noise)
@@ -385,7 +390,8 @@ if CON == 1:
 
     if IF_PSS:
         start_data = -1
-        if_start = 0.9 + 0.9j
+        #if_start = 0.95 + 0.95j
+        if_start = 0.8 + 0.8j
         arr_cor_pos = []
         for i in range(0, len(ofdm_rx_pss_calc) - len(pss_fft)):
             
@@ -422,7 +428,7 @@ if CON == 1:
     
     
     #a2 = np.convolve()
-    if 0:
+    if 1:
         data = indiv_symbols(ofdm_rx_2, Nb, N_interval)
         data = data.flatten()
         plt.figure(61, figsize=(10, 10))
@@ -440,53 +446,59 @@ if CON == 1:
         plt.title("OFDM, count " + str(ofdm_argv[1]))
         plt.plot(abs(np.fft.fft(data_decode,int(1e6))))
     #EXIT()
-    #if 0:
-    for i in range(0, len(ofdm_rx_2) - Nb):
+    if 0:
+            
+        for i in range(0, len(ofdm_rx_2) - Nb):
+            
+            #a = np.vdot(data_read2[0:N_interval], data_read2[Nb:Nb + N_interval])
+           
+            a = sample.norm_corr(ofdm_rx_2[0:N_interval], 
+                                 ofdm_rx_2[len_one_ofdm - N_interval: len_one_ofdm])
+            #a = abs(a)
+            #print("a = ", abs(a.real), abs(a.imag), end = " | ")
+            
+            if start_data == -1 and a.real >= abs(if_start.real) and a.imag > (if_start.imag):
+            #if start_data == -1 and a >= if_start:
+                start_data = i
+    
+            # if start_data == -1 and -if_start <= a and a <= if_start:
+            #     start_data = i
+            arr.append(a)
+            ofdm_rx_2 = np.roll(ofdm_rx_2, -1)
         
-        #a = np.vdot(data_read2[0:N_interval], data_read2[Nb:Nb + N_interval])
-       
-        a = sample.norm_corr(ofdm_rx_2[0:N_interval], 
-                             ofdm_rx_2[len_one_ofdm - N_interval: len_one_ofdm])
-        #a = abs(a)
-        #print("a = ", abs(a.real), abs(a.imag), end = " | ")
         
-        if start_data == -1 and a.real >= abs(if_start.real) and a.imag > (if_start.imag):
-        #if start_data == -1 and a >= if_start:
-            start_data = i
-
-        # if start_data == -1 and -if_start <= a and a <= if_start:
-        #     start_data = i
-        arr.append(a)
-        ofdm_rx_2 = np.roll(ofdm_rx_2, -1)
-        
-        
-    for i in range(0, len(ofdm_rx_2) - Nb):
-        
-        #a = np.vdot(data_read2[0:N_interval], data_read2[Nb:Nb + N_interval])
-       
-        a = sample.norm_corr(ofdm_rx_2[0:N_interval], 
-                             ofdm_rx_2[len_one_ofdm - N_interval: len_one_ofdm])
-        #a = abs(a)
-        #print("a = ", abs(a.real), abs(a.imag), end = " | ")
-        
-        if start_data == -1 and a.real >= abs(if_start.real) and a.imag > (if_start.imag):
-        #if start_data == -1 and a >= if_start:
-            start_data = i
-
-        # if start_data == -1 and -if_start <= a and a <= if_start:
-        #     start_data = i
-        arr.append(a)
-        ofdm_rx_2 = np.roll(ofdm_rx_2, -1)
-    plt.figure(51, figsize = (10, 10))
-    plt.subplot(2, 2, 1)
-    plt.title("Correlation")
-    plt.plot(arr)
-    if(start_data == -1):
-        print("не удалось определить начало")
-        EXIT()
+    if 0:
+        for i in range(0, len(ofdm_rx_2) - Nb):
+            
+            #a = np.vdot(data_read2[0:N_interval], data_read2[Nb:Nb + N_interval])
+           
+            a = sample.norm_corr(ofdm_rx_2[0:N_interval], 
+                                 ofdm_rx_2[len_one_ofdm - N_interval: len_one_ofdm])
+            #a = abs(a)
+            #print("a = ", abs(a.real), abs(a.imag), end = " | ")
+            
+            if start_data == -1 and a.real >= abs(if_start.real) and a.imag > (if_start.imag):
+            #if start_data == -1 and a >= if_start:
+                start_data = i
+    
+            # if start_data == -1 and -if_start <= a and a <= if_start:
+            #     start_data = i
+            arr.append(a)
+            ofdm_rx_2 = np.roll(ofdm_rx_2, -1)
+        plt.figure(51, figsize = (10, 10))
+        plt.subplot(2, 2, 1)
+        plt.title("Correlation")
+        plt.plot(arr)
+        if(start_data == -1):
+            print("не удалось определить начало")
+            EXIT()
+            
+    start_data = 0
     print("Начало данных:", start_data)
     #start_data = 19
     #EXIT(1)
+    
+    ofdm_rx = ofdm_rx_2
     data_rx = ofdm_rx[start_data:start_data + len_data_tx]
     plt.figure(52, figsize=(10, 10))
     plt.subplot(2, 2, 1)

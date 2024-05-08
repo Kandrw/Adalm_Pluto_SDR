@@ -298,7 +298,7 @@ def norm_corr3(data, seq):
 
 def correlat_ofdm(rx_ofdm, cp,num_carrier):
     max = 0
-    rx1 = rx_ofdm
+    rx1 = rx_ofdm.copy()
     cor = []
     cor_max = []
     index = -1
@@ -334,11 +334,12 @@ def del_prefix_while(data, Nb, N_interval):
 
 def PSS_to_freq(pss):
     pss_qpsk = np.array(encode_QAM(pss, 4))
-    
+    pss_qpsk *= 2**14
     pss_f = np.fft.ifft(pss_qpsk)
     return pss_f
 
 def add_PSS(ofdm, pss_f):
+    z1 = np.zeros(5)
     return np.concatenate([pss_f, ofdm])
 #=======================================================================================================================
 
