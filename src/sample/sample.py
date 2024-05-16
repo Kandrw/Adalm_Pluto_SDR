@@ -341,6 +341,62 @@ def PSS_to_freq(pss):
 def add_PSS(ofdm, pss_f):
     z1 = np.zeros(5)
     return np.concatenate([pss_f, ofdm])
+
+
+def pss_time(fft_len, pss):
+
+    #pss = zadoff_chu(PSS = True)
+        
+    zeros = fft_len // 2 - 31
+    pss_ifft = np.insert(pss, 32, 0)
+    pss_ifft = np.insert(pss_ifft, 0, np.zeros(zeros))
+    pss_ifft = np.append(pss_ifft, np.zeros(zeros-1))
+        
+    pss_ifft = np.fft.fftshift(pss_ifft)
+    pss_ifft = np.fft.ifft(pss_ifft)
+
+    return pss_ifft
+def calculate_correlation(fft_len, matrix_name, m, pss):
+    """
+    Calculates correlation between pss and matrix_name with filtering and delay.
+
+    Args:
+    pss: The reference signal.
+    matrix_name: The signal to compare with pss.
+    m: Decimation factor.
+
+    Returns:
+    A tuple containing the correlation and carrier frequency offset (CFO).
+    """
+    pss = pss_time(fft_len, pss)
+    L = len(pss)
+    print("pss",L)
+    # Flipped and complex conjugated reference signal
+    corr_coef = np.flip(np.conjugate(pss))
+
+    # Filter reference signal sections
+    partA = np.convolve(corr_coef[:L // 2], matrix_name, mode='full')
+    xDelayed = np.concatenate((np.zeros(L // 2), matrix_name[:-L // 2]))
+    partB = np.convolve(corr_coef[L // 2:], xDelayed, mode='full')
+
+    # Calculate correlation and phase difference
+    correlation = np.abs(partA + partB)
+    phaseDiff = partA * np.conj(partB)
+
+    # Find maximum correlation and corresponding phase difference
+    istart = np.argmax(correlation)
+    phaseDiff_max = phaseDiff[istart]
+
+    # Calculate CFO
+    CFO = np.angle(phaseDiff_max) / (np.pi * 1 / m)
+    t = np.arange(0,len(matrix_name))
+    t = t / 1920000
+
+
+    data_offset = matrix_name * np.exp(-1j * 2 * np.pi * np.conjugate(CFO) * t)
+
+    return data_offset
+
 #=======================================================================================================================
 
 #Не преминяется для QAM16 

@@ -111,11 +111,11 @@ PLATFORM = platform.system()#"Linux"
 
 sample_rate  = 1000000
 
-IF_SDR = True
+IF_SDR = 1#True
 READ_FILE = 0#Если True, то игнорируются блоки: 1, 2, 3, 4, сигнал считывается из файла
 COUNT_SDR = 1 # 1-2
 CON = 1# метод обработки сигнала (1, 2)
-IF_PSS = True
+IF_PSS = 1#True
 
 
 filename_output = "input_qpsk.txt" #файл записи принятого сигнала
@@ -208,10 +208,16 @@ if 1:
                0, 1, 0, 1, 0, 0, 0, 1, 0, 
                1, 1, 1, 0, 0, 1, 1, 0, 1,
                1, 0, 1, 1, 0, 0, 1, 0, 1,
-               1, 1, 1, 1, 0, 1, 1, 0, 1, 1
+               1, 1, 1, 1, 0, 1, 1, 0, 1,
+               1, 1, 0, 0, 0, 1, 1, 0, 1,
+               1, 0, 1, 0, 1, 0, 1, 0, 1
                ]
         
-        pss_fft = sample.PSS_to_freq(pss)
+        #pss_fft = sample.PSS_to_freq(pss[:20])
+        #EXIT(1)
+        pss_fft = np.array(pss) + np.array(pss) * 1j
+        pss_fft *= 2 ** 14
+        pss_fft = np.fft.ifft(pss_fft)
         print("len pss = ", len(pss_fft))
         plt.figure(5, figsize=(10, 10))
         plt.subplot(2, 2, 1)
@@ -343,7 +349,7 @@ if READ_FILE == 0:
         print("Add noise")
         plt.figure(31, figsize = (10, 10))
         
-        e = 30
+        e = 1000
         e_no_data = 1000
         np.random.normal
         start_t_data = 40
@@ -407,7 +413,7 @@ if CON == 1:
     if IF_PSS:
         if 0:
             start_data = -1
-            if_start = 0.7 + 0.7j
+            if_start = 0.8 + 0.8j
             arr_cor_pos = []
             for i in range(0, len(ofdm_rx_pss_calc) - len(pss_fft)):
                 
@@ -419,7 +425,6 @@ if CON == 1:
                 
                     start_data = i + len(pss_fft)
                     #start_data = 58
-                    print("FFFFFFFff")
                 arr_cor_pos.append(a)
                 ofdm_rx_pss_calc = np.roll(ofdm_rx_pss_calc, -1)
                 
@@ -430,8 +435,8 @@ if CON == 1:
             plt.plot(arr_cor_pos)
         else:
             start_data = -1
-            if_start = 0.7 + 0.7j
-            max_corr = -1
+            if_start = 0.8 + 0.8j
+            max_corr = -0.5
             arr_cor_pos = []
             for i in range(0, len(ofdm_rx_pss_calc) - len(pss_fft)):
                 
@@ -439,12 +444,12 @@ if CON == 1:
                     pss_fft)
         
                 #if start_data == -1 and a.real >= abs(if_start.real) and a.imag >= abs(if_start.imag):
-                if abs(a) > abs(max_corr) :
+                if abs(a) >= abs(max_corr)  :
                 
-                    start_data = i + len(pss_fft)
+                    start_data = i #+ len(pss_fft)
                     max_corr = a
                     #start_data = 58
-                arr_cor_pos.append(a)
+                arr_cor_pos.append(abs(a))
                 ofdm_rx_pss_calc = np.roll(ofdm_rx_pss_calc, -1)
                 
             print("Начало PSS:", start_data, "max_corr:", max_corr, abs(max_corr))
@@ -463,19 +468,20 @@ if CON == 1:
     #print("index1:", index1)
     ofdm_rx_2 = ofdm_rx.copy()
     ofdm_rx_2 = ofdm_rx_2[start_data:]
-    ofdm_rx_3 = ofdm_rx_2.copy()
-    arr = []
-    start_data = -1
-    if_start = 0.95 + 0.95j
+    
+    
     # print("0 :", N_interval)
     # print(N_interval, ":", Nb)
     print("0 :", N_interval)
     print(len_one_ofdm - N_interval, ":", len_one_ofdm)
     
-
-
-        
-    if 0:  
+    ofdm_rx_2 = sample.calculate_correlation(Nb, ofdm_rx_2, 1e6 // Nb, pss_fft)
+    ofdm_rx_3 = ofdm_rx_2.copy()
+    CON2 = 2
+    if 1 == CON2:  
+        arr = []
+        start_data = -1
+        if_start = 0.95 + 0.95j
         for i in range(0, len(ofdm_rx_2) - Nb):
             
             #a = np.vdot(data_read2[0:N_interval], data_read2[Nb:Nb + N_interval])
@@ -501,6 +507,70 @@ if CON == 1:
             print("не удалось определить начало")
             EXIT()
         print("Начало данных:", start_data)
+    elif 2 == CON2:
+        arr = []
+        start_data = -1
+        if_start = 0.9 + 0.9j
+        max_corr = -0.5
+        for i in range(0, len(ofdm_rx_2) - Nb):
+            
+            #a = np.vdot(data_read2[0:N_interval], data_read2[Nb:Nb + N_interval])
+           
+            a = sample.norm_corr(ofdm_rx_2[0:N_interval], 
+                                 ofdm_rx_2[len_one_ofdm - N_interval: len_one_ofdm])
+            #a = abs(a)
+            #print("a = ", abs(a.real), abs(a.imag), end = " | ")
+            
+            if abs(a) > abs(max_corr):
+                max_corr = a
+                start_data = i
+    
+            # if start_data == -1 and -if_start <= a and a <= if_start:
+            #     start_data = i
+            arr.append(abs(a))
+            ofdm_rx_2 = np.roll(ofdm_rx_2, -1)
+        plt.figure(51, figsize = (10, 10))
+        plt.subplot(2, 2, 1)
+        plt.title("Correlation")
+        plt.plot(arr)
+        if(start_data == -1):
+            print("[2] не удалось определить начало")
+            EXIT()
+        print("[2] Начало данных:", start_data)
+    elif 3 == CON2:
+        read_ofdms = np.array([])
+        
+        step = 0
+        for index in range(ofdm_argv[1]):
+            
+            arr = []
+            start_data = -1
+            max_corr = -0.5
+            ofdm_rx_2_iter = ofdm_rx_2[step:]
+            for i in range(0, len(ofdm_rx_2_iter) - Nb):
+                
+                #a = np.vdot(data_read2[0:N_interval], data_read2[Nb:Nb + N_interval])
+               
+                a = sample.norm_corr(ofdm_rx_2_iter[0:N_interval], 
+                                     ofdm_rx_2_iter[len_one_ofdm - N_interval: len_one_ofdm])
+                #a = abs(a)
+                #print("a = ", abs(a.real), abs(a.imag), end = " | ")
+                
+                if abs(a) > abs(max_corr):
+                    max_corr = a
+                    start_data = i
+                arr.append(abs(a))
+                ofdm_rx_2_iter = np.roll(ofdm_rx_2_iter, -1)
+            plt.figure(51 + index, figsize = (10, 10))
+            plt.subplot(2, 2, 1)
+            plt.title("Correlation")
+            plt.plot(arr)
+            if(start_data == -1):
+                print("[2] не удалось определить начало")
+                EXIT()
+            print("[2] Начало данных:", start_data)
+            step += 0
+            
     else:
         start_data = 0
     #start_data = 19
